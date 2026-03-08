@@ -1,0 +1,51 @@
+model:
+  model_id: "taide/Gemma-3-TAIDE-12b-Chat-2602"
+
+quantization:
+  load_in_4bit: true
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_compute_dtype: "bfloat16"
+
+lora:
+  r: 32
+  lora_alpha: 64
+  lora_dropout: 0.1
+  target_modules: "all-linear"
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+training:
+  output_dir: "outputs/bible-assistant"
+  num_train_epochs: 2
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 1.0e-4
+  weight_decay: 0.01
+  max_length: 2560
+  packing: true
+  gradient_checkpointing: true
+  optim: "paged_adamw_8bit"
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.05
+  neftune_noise_alpha: 5
+  logging_steps: 10
+  save_strategy: "steps"
+  save_steps: 200
+  save_total_limit: 5
+  eval_strategy: "steps"
+  eval_steps: 200
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+  bf16: true
+  report_to: "trackio"
+
+dataset:
+  test_size: 0.1
+  seed: 42
+
+trackio:
+  project: "bible-fine-tuning"
+  run_name: "qlora-taide-gemma3-12b"
+  space_id: "KenZx0521/fine-tuning_bible"      # HF Space ID (e.g. "username/bible-fine-tuning"), leave empty for local-only
+  dataset_id: ""    # HF Dataset ID for metric backup, leave empty for auto-naming
