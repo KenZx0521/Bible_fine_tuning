@@ -122,7 +122,7 @@ sft_config = SFTConfig(**sft_kwargs)
 # import trackio
 # trackio.init(
 #     project="bible-fine-tuning",
-#     name="qlora-taide-gemma3-12b",
+#     name="qlora-gemma3-12b",
 #     space_id="KenZx0521/fine-tuning_bible",
 #     config={...},
 # )

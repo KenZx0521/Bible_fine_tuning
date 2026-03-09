@@ -1,5 +1,5 @@
 model:
-  model_id: "taide/Gemma-3-TAIDE-12b-Chat-2602"
+  model_id: "google/gemma-3-12b-it"
 
 quantization:
   load_in_4bit: true
@@ -50,6 +50,6 @@ dataset:
 
 trackio:
   project: "bible-fine-tuning"
-  run_name: "qlora-taide-gemma3-12b"
+  run_name: "qlora-gemma3-12b"
   space_id: "KenZx0521/fine-tuning_bible"      # HF Space ID (e.g. "username/bible-fine-tuning"), leave empty for local-only
   dataset_id: ""    # HF Dataset ID for metric backup, leave empty for auto-naming

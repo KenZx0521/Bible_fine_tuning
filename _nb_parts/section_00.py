@@ -3,7 +3,7 @@ cells.append(md("""# 聖經知識助手 — QLoRA 微調全流程 Notebook
 
 ## 專案概述
 
-使用 **TAIDE (Gemma-3-TAIDE-12b-Chat)** 模型，透過 **QLoRA** 技術對繁體中文和合本聖經進行微調，
+使用 **Gemma-3-12B-IT** 模型，透過 **QLoRA** 技術對繁體中文和合本聖經進行微調，
 建立能夠準確引用經文、解釋段落、回答聖經相關問題的知識助手。
 
 ## Pipeline 流程

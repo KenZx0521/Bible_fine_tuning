@@ -9,7 +9,7 @@ cells.append(md("""---
 - `report_to` 預設為 `"none"`，如需 Trackio 追蹤可改為 `"trackio"`"""))
 
 cells.append(code("""# ── 模型與路徑 ──
-MODEL_ID = "taide/Gemma-3-TAIDE-12b-Chat-2602"
+MODEL_ID = "google/gemma-3-12b-it"
 
 DATA_DIR = "/kaggle/input/datasets/kenzx0521/bible-data/bible_data"
 OUTPUT_DIR = "/kaggle/working/outputs"
@@ -86,7 +86,7 @@ CONFIG = {
     # Trackio 設定（report_to="trackio" 時啟用）
     # "trackio": {
     #     "project": "bible-fine-tuning",
-    #     "run_name": "qlora-taide-gemma3-12b",
+    #     "run_name": "qlora-gemma3-12b",
     #     "space_id": "KenZx0521/fine-tuning_bible",
     # },
 }

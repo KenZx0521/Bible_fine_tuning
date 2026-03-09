@@ -1,6 +1,6 @@
 # Fine-Tuning Bible
 
-使用 [TAIDE Gemma-3-12B](https://huggingface.co/taide/Gemma-3-TAIDE-12b-Chat-2602) 模型進行 QLoRA SFT fine-tuning，建立繁體中文聖經知識問答助手。
+使用 [Gemma-3-12B-IT](https://huggingface.co/google/gemma-3-12b-it) 模型進行 QLoRA SFT fine-tuning，建立繁體中文聖經知識問答助手。
 
 ## 功能特色
 
@@ -130,7 +130,7 @@ uv run python -m src.evaluation.evaluate
 
 | 參數 | 值 |
 |------|-----|
-| 基礎模型 | `taide/Gemma-3-TAIDE-12b-Chat-2602` |
+| 基礎模型 | `google/gemma-3-12b-it` |
 | 量化 | 4-bit NF4, double quant, bfloat16 |
 | LoRA rank | 16 |
 | LoRA alpha | 32 |

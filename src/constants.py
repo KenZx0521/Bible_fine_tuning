@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-MODEL_ID = "taide/Gemma-3-TAIDE-12b-Chat-2602"
+MODEL_ID = "google/gemma-3-12b-it"
 
 SYSTEM_PROMPT = (
     "你是一位精通聖經的知識助手，熟悉繁體中文和合本聖經的所有內容。"

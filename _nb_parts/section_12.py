@@ -6,7 +6,7 @@ cells.append(md("""---
 
 - [x] 解析 66 卷聖經 Markdown 檔案
 - [x] 生成 ~19,000 筆訓練樣本（6 種類型）
-- [x] QLoRA 微調 TAIDE-12B 模型
+- [x] QLoRA 微調 Gemma-3-12B-IT 模型
 - [x] 合併 LoRA adapter
 - [x] 多維度評估
 - [x] 互動推論測試
