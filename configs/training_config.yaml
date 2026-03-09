@@ -9,11 +9,14 @@ quantization:
 
 lora:
   r: 16
-  lora_alpha: 32
+  lora_alpha: 16
   lora_dropout: 0.1
   target_modules: "all-linear"
   bias: "none"
   task_type: "CAUSAL_LM"
+  modules_to_save:
+    - "lm_head"
+    - "embed_tokens"
 
 training:
   output_dir: "outputs/bible-assistant"
@@ -29,6 +32,7 @@ training:
   lr_scheduler_type: "cosine"
   warmup_ratio: 0.05
   neftune_noise_alpha: 5
+  max_grad_norm: 0.3
   logging_steps: 10
   save_strategy: "steps"
   save_steps: 200

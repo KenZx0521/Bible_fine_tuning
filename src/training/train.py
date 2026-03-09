@@ -39,14 +39,17 @@ def _build_bnb_config(quant_cfg: dict) -> BitsAndBytesConfig:
 
 def _build_lora_config(lora_cfg: dict) -> LoraConfig:
     """Build LoRA configuration."""
-    return LoraConfig(
-        r=lora_cfg["r"],
-        lora_alpha=lora_cfg["lora_alpha"],
-        lora_dropout=lora_cfg["lora_dropout"],
-        target_modules=lora_cfg["target_modules"],
-        bias=lora_cfg["bias"],
-        task_type=lora_cfg["task_type"],
-    )
+    kwargs: dict = {
+        "r": lora_cfg["r"],
+        "lora_alpha": lora_cfg["lora_alpha"],
+        "lora_dropout": lora_cfg["lora_dropout"],
+        "target_modules": lora_cfg["target_modules"],
+        "bias": lora_cfg["bias"],
+        "task_type": lora_cfg["task_type"],
+    }
+    if lora_cfg.get("modules_to_save"):
+        kwargs["modules_to_save"] = lora_cfg["modules_to_save"]
+    return LoraConfig(**kwargs)
 
 
 def train() -> None:
@@ -151,6 +154,8 @@ def train() -> None:
     }
     if train_cfg.get("neftune_noise_alpha") is not None:
         sft_kwargs["neftune_noise_alpha"] = train_cfg["neftune_noise_alpha"]
+    if train_cfg.get("max_grad_norm") is not None:
+        sft_kwargs["max_grad_norm"] = train_cfg["max_grad_norm"]
     if train_cfg.get("load_best_model_at_end"):
         sft_kwargs["load_best_model_at_end"] = True
         sft_kwargs["metric_for_best_model"] = train_cfg.get(
