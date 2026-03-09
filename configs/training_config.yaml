@@ -8,7 +8,7 @@ quantization:
   bnb_4bit_compute_dtype: "bfloat16"
 
 lora:
-  r: 32
+  r: 16
   lora_alpha: 32
   lora_dropout: 0.1
   target_modules: "all-linear"
@@ -18,11 +18,11 @@ lora:
 training:
   output_dir: "outputs/bible-assistant"
   num_train_epochs: 2
-  per_device_train_batch_size: 2
-  gradient_accumulation_steps: 8
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
   learning_rate: 1.0e-4
   weight_decay: 0.01
-  max_length: 2560
+  max_length: 1536
   packing: true
   gradient_checkpointing: true
   optim: "paged_adamw_8bit"
