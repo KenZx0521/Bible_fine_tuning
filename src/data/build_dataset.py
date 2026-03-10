@@ -89,7 +89,7 @@ def _print_sample_preview(samples: list[Sample], n: int = 2) -> None:
             print()
 
 
-_MAX_TOTAL_CHARS = 1400  # ~2048 tokens upper bound
+_MAX_TOTAL_CHARS = 2000  # ~2048 max_length with buffer for chat template tokens
 
 
 def _estimate_too_long(sample: Sample, max_chars: int = _MAX_TOTAL_CHARS) -> bool:
