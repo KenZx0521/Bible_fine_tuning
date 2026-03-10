@@ -117,6 +117,10 @@ def train() -> None:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # Gemma 3 tokenizer 預設包含 token_type_ids，但 SFTTrainer 不會產生它，需移除
+    if "token_type_ids" in tokenizer.model_input_names:
+        tokenizer.model_input_names.remove("token_type_ids")
+
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         quantization_config=bnb_config,
@@ -173,6 +177,18 @@ def train() -> None:
         peft_config=lora_config,
         processing_class=tokenizer,
     )
+
+    # Gemma 3 forward() 需要 token_type_ids，但 SFTTrainer 不會產生它
+    # 包裝 data collator，自動注入 token_type_ids（全 0 = 純文字）
+    _original_collator = trainer.data_collator
+
+    def _collator_with_token_type_ids(features, **kwargs):
+        batch = _original_collator(features, **kwargs)
+        if "token_type_ids" not in batch:
+            batch["token_type_ids"] = torch.zeros_like(batch["input_ids"])
+        return batch
+
+    trainer.data_collator = _collator_with_token_type_ids
 
     trainer.train()
 
