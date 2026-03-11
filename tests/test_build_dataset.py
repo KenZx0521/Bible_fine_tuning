@@ -191,13 +191,13 @@ class TestTokenLengthFilter:
 
     def test_long_sample_filtered(self):
         """A sample exceeding _MAX_TOTAL_CHARS should be detected."""
-        long_answer = "很長的回答。" * 300  # well over 1400 chars
+        long_answer = "很長的回答。" * 450
         sample = _make_sample(question="問題", answer=long_answer)
         assert _estimate_too_long(sample)
 
     def test_long_sample_excluded_from_dataset(self):
         """Overly long samples should be excluded from the final dataset."""
-        long_answer = "超長" * 800  # 1600 chars answer alone
+        long_answer = "超長" * 1100
         normal_samples = [
             _make_sample(question=f"正常問題{i}", answer=f"正常回答{i}")
             for i in range(10)

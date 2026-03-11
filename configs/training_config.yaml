@@ -8,9 +8,9 @@ quantization:
   bnb_4bit_compute_dtype: "bfloat16"
 
 lora:
-  r: 16
-  lora_alpha: 16
-  lora_dropout: 0.1
+  r: 32
+  lora_alpha: 64
+  lora_dropout: 0.05
   target_modules: "all-linear"
   bias: "none"
   task_type: "CAUSAL_LM"
@@ -20,25 +20,25 @@ lora:
 
 training:
   output_dir: "outputs/bible-assistant"
-  num_train_epochs: 2
-  per_device_train_batch_size: 1
-  gradient_accumulation_steps: 16
-  learning_rate: 1.0e-4
+  num_train_epochs: 2.0
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 5.0e-5
   weight_decay: 0.01
-  max_length: 2048
-  packing: true
+  max_length: 1536
+  packing: false
   gradient_checkpointing: true
   optim: "paged_adamw_8bit"
   lr_scheduler_type: "cosine"
-  warmup_ratio: 0.05
+  warmup_ratio: 0.10
   neftune_noise_alpha: 5
   max_grad_norm: 0.3
   logging_steps: 10
   save_strategy: "steps"
-  save_steps: 200
+  save_steps: 100
   save_total_limit: 5
   eval_strategy: "steps"
-  eval_steps: 200
+  eval_steps: 100
   load_best_model_at_end: true
   metric_for_best_model: "eval_loss"
   bf16: true
@@ -50,6 +50,6 @@ dataset:
 
 trackio:
   project: "bible-fine-tuning"
-  run_name: "qlora-gemma3-12b"
+  run_name: "qlora-gemma3-12b-answer-first"
   space_id: "KenZx0521/fine-tuning_bible"      # HF Space ID (e.g. "username/bible-fine-tuning"), leave empty for local-only
   dataset_id: ""    # HF Dataset ID for metric backup, leave empty for auto-naming

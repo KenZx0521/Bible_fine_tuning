@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import random
 
-from src.constants import SYSTEM_PROMPT, SYSTEM_PROMPT_VARIANTS
+from src.constants import (
+    GENERAL_QA_SYSTEM_PROMPT_VARIANTS,
+    LOOKUP_SYSTEM_PROMPT_VARIANTS,
+)
 from src.data.dataset_generator import (
     _MIN_SAMPLES_PER_BOOK,
     _fix_quote_pairing,
@@ -18,6 +21,8 @@ from src.data.dataset_generator import (
     generate_type_d,
     generate_type_e,
     generate_type_f,
+    generate_type_g,
+    generate_type_h,
 )
 from src.data.templates import (
     _FAKE_BOOKS,
@@ -49,7 +54,7 @@ class TestTypeA:
         assert sample.sample_type == "A"
         assert len(sample.messages) == 3
         assert sample.messages[0]["role"] == "system"
-        assert sample.messages[0]["content"] in SYSTEM_PROMPT_VARIANTS
+        assert sample.messages[0]["content"] in LOOKUP_SYSTEM_PROMPT_VARIANTS
         assert sample.messages[1]["role"] == "user"
         assert sample.messages[2]["role"] == "assistant"
 
@@ -252,6 +257,44 @@ class TestTypeF:
         )
 
 
+class TestTypeG:
+    """Tests for answer-first Bible QA samples."""
+
+    def test_generates_samples(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_g(sample_books, rng)
+        assert len(samples) > 0
+
+    def test_uses_general_prompt(self, sample_books):
+        rng = random.Random(42)
+        sample = generate_type_g(sample_books, rng)[0]
+        assert sample.messages[0]["content"] in GENERAL_QA_SYSTEM_PROMPT_VARIANTS
+
+    def test_answer_mentions_support_reference(self, sample_books):
+        rng = random.Random(42)
+        answers = [s.messages[2]["content"] for s in generate_type_g(sample_books, rng)]
+        assert any("可參考" in a or "相關經文" in a for a in answers)
+
+
+class TestTypeH:
+    """Tests for citation-light Bible QA samples."""
+
+    def test_generates_samples(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_h(sample_books, rng)
+        assert len(samples) > 0
+
+    def test_question_explicitly_discourages_quote_dumping(self, sample_books):
+        rng = random.Random(42)
+        questions = [s.messages[1]["content"] for s in generate_type_h(sample_books, rng)]
+        assert any("不要" in q or "不用" in q for q in questions)
+
+    def test_answer_stays_concise(self, sample_books):
+        rng = random.Random(42)
+        answers = [s.messages[2]["content"] for s in generate_type_h(sample_books, rng)]
+        assert all("第1節：" not in a for a in answers)
+
+
 class TestGenerateAll:
     """Tests for full sample generation."""
 
@@ -262,6 +305,8 @@ class TestGenerateAll:
         assert "B" in types
         assert "D" in types
         assert "F" in types  # Refusal samples always present
+        assert "G" in types
+        assert "H" in types
 
     def test_deterministic(self, sample_books):
         samples1 = generate_all_samples(sample_books, seed=42)
@@ -644,20 +689,30 @@ class TestSystemPromptVariants:
 
     def test_all_variants_contain_bible_keyword(self):
         """All system prompt variants should contain '聖經'."""
-        for variant in SYSTEM_PROMPT_VARIANTS:
+        all_variants = (
+            GENERAL_QA_SYSTEM_PROMPT_VARIANTS + LOOKUP_SYSTEM_PROMPT_VARIANTS
+        )
+        for variant in all_variants:
             assert "聖經" in variant, f"Variant missing '聖經': {variant}"
 
     def test_all_variants_are_strings(self):
         """All system prompt variants should be non-empty strings."""
-        assert isinstance(SYSTEM_PROMPT_VARIANTS, tuple)
-        assert len(SYSTEM_PROMPT_VARIANTS) >= 4
-        for variant in SYSTEM_PROMPT_VARIANTS:
+        all_variants = (
+            GENERAL_QA_SYSTEM_PROMPT_VARIANTS + LOOKUP_SYSTEM_PROMPT_VARIANTS
+        )
+        assert isinstance(all_variants, tuple)
+        assert len(all_variants) >= 6
+        for variant in all_variants:
             assert isinstance(variant, str)
             assert len(variant) > 20
 
-    def test_original_prompt_in_variants(self):
-        """The original SYSTEM_PROMPT should be one of the variants."""
-        assert SYSTEM_PROMPT in SYSTEM_PROMPT_VARIANTS
+    def test_general_and_lookup_prompts_both_present(self, sample_books):
+        """The generator should rotate both general and lookup prompt pools."""
+        prompts_seen = {
+            s.messages[0]["content"] for s in generate_all_samples(sample_books, seed=42)
+        }
+        assert any(p in prompts_seen for p in GENERAL_QA_SYSTEM_PROMPT_VARIANTS)
+        assert any(p in prompts_seen for p in LOOKUP_SYSTEM_PROMPT_VARIANTS)
 
 
 class TestTypeEEnrichedAnswers:

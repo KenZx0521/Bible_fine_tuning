@@ -2,10 +2,9 @@
 
 Dimensions:
   1. Verse recall — ROUGE-L + exact match on verse lookup
-  2. Section knowledge — key verse coverage in section summaries
-  3. Verse identification — accuracy of source identification
-  4. Anti-hallucination — hallucination rate on non-existent references
-  5. Perplexity — compared to base model
+  2. Verse identification — accuracy of source identification
+  3. Anti-hallucination — hallucination rate on non-existent references
+  4. Citation balance — over-citation rate + direct opening rate
 
 Run: uv run python -m src.evaluation.evaluate
 """
@@ -14,6 +13,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import sys
 
 import torch
@@ -21,9 +21,9 @@ from dotenv import load_dotenv
 from rouge_score import rouge_scorer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from src.constants import MODEL_ID, OUTPUT_DIR, SYSTEM_PROMPT
+from src.constants import DATA_DIR, MODEL_ID, OUTPUT_DIR
 from src.data.parser import parse_all_books
-from src.constants import DATA_DIR
+from src.response_policy import get_system_prompt, select_response_mode
 
 
 def _load_model_and_tokenizer(model_path: str | None = None):
@@ -60,8 +60,9 @@ def _generate_response(
     model, tokenizer, question: str, max_new_tokens: int = 512
 ) -> str:
     """Generate a response from the model."""
+    response_mode = select_response_mode(question)
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_system_prompt(response_mode)},
         {"role": "user", "content": question},
     ]
     input_text = tokenizer.apply_chat_template(
@@ -187,6 +188,47 @@ def evaluate_anti_hallucination(
     }
 
 
+def evaluate_citation_balance(model, tokenizer) -> dict:
+    """Measure whether general QA answers still over-cite verses."""
+    questions = [
+        "請用簡單的話回答：聖經如何看待信心？",
+        "不要整段貼經文，聖經如何看待饒恕？",
+        "請先直接回答重點：聖經中的盼望大概是什麼意思？",
+        "不用逐字查經文，聖經如何談平安？",
+        "如果有人問聖經怎麼看待智慧，請先用白話回答。",
+        "請不要先引用一大段經文，直接回答聖經如何看待恩典。",
+    ]
+
+    over_citations = 0
+    direct_openings = 0
+    ref_pattern = re.compile(r"第\d+章第[\d-]+節")
+    bad_openings = (
+        "根據",
+        "以下是",
+        "讓我為您引用",
+        "這節經文",
+        "您所詢問的",
+        "經查閱",
+    )
+
+    for question in questions:
+        response = _generate_response(model, tokenizer, question, max_new_tokens=256)
+        ref_count = len(ref_pattern.findall(response))
+        quote_count = response.count("「") + response.count("『")
+        if ref_count > 2 or quote_count > 4:
+            over_citations += 1
+
+        first_sentence = response.split("。", 1)[0].strip()
+        if first_sentence and not first_sentence.startswith(bad_openings):
+            direct_openings += 1
+
+    return {
+        "over_citation_rate": round(over_citations / len(questions), 4),
+        "direct_opening_rate": round(direct_openings / len(questions), 4),
+        "n_samples": len(questions),
+    }
+
+
 def evaluate(model_path: str | None = None) -> None:
     """Run all evaluation dimensions."""
     load_dotenv()
@@ -196,30 +238,35 @@ def evaluate(model_path: str | None = None) -> None:
     print("=" * 60)
 
     # Load model
-    print("\n[1/5] 載入模型...")
+    print("\n[1/6] 載入模型...")
     model, tokenizer = _load_model_and_tokenizer(model_path)
 
     # Parse Bible for ground truth
-    print("\n[2/5] 解析聖經資料...")
+    print("\n[2/6] 解析聖經資料...")
     books = parse_all_books(DATA_DIR)
 
     # Evaluate
     results = {}
 
-    print("\n[3/5] 經文召回評估...")
+    print("\n[3/6] 經文召回評估...")
     results["verse_recall"] = evaluate_verse_recall(model, tokenizer, books)
     print(f"    ROUGE-L: {results['verse_recall']['avg_rouge_l']}")
     print(f"    Exact Match: {results['verse_recall']['exact_match_rate']}")
 
-    print("\n[4/5] 經文辨識評估...")
+    print("\n[4/6] 經文辨識評估...")
     results["verse_identification"] = evaluate_verse_identification(
         model, tokenizer, books
     )
     print(f"    Accuracy: {results['verse_identification']['accuracy']}")
 
-    print("\n[5/5] 抗幻覺評估...")
+    print("\n[5/6] 抗幻覺評估...")
     results["anti_hallucination"] = evaluate_anti_hallucination(model, tokenizer)
     print(f"    Hallucination Rate: {results['anti_hallucination']['hallucination_rate']}")
+
+    print("\n[6/6] 回答風格評估...")
+    results["citation_balance"] = evaluate_citation_balance(model, tokenizer)
+    print(f"    Over-citation Rate: {results['citation_balance']['over_citation_rate']}")
+    print(f"    Direct Opening Rate: {results['citation_balance']['direct_opening_rate']}")
 
     # Save results
     results_path = OUTPUT_DIR / "evaluation_results.json"
@@ -236,6 +283,8 @@ def evaluate(model_path: str | None = None) -> None:
     print(f"  經文召回 Exact Match: {results['verse_recall']['exact_match_rate']}")
     print(f"  經文辨識 Accuracy:    {results['verse_identification']['accuracy']}")
     print(f"  幻覺率:               {results['anti_hallucination']['hallucination_rate']}")
+    print(f"  過度引用率:           {results['citation_balance']['over_citation_rate']}")
+    print(f"  直接回答率:           {results['citation_balance']['direct_opening_rate']}")
     print("=" * 60)
 
 

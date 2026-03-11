@@ -1,29 +1,41 @@
 """Training sample generators for Bible QA fine-tuning.
 
-Generates 6 types of QA samples (A-F) in TRL SFT messages format:
+Generates 8 types of QA samples (A-H) in TRL SFT messages format:
   A: Verse lookup — query specific verse text (with downsampling)
   B: Section summary — summarize a section (filtered & truncated)
   C: Thematic verses — find verses by topic keyword (multi-faceted)
   D: Context understanding — provide verse context
   E: Verse identification — identify verse source from quote
   F: Refusal — reject out-of-scope or non-existent queries
+  G: General Bible QA — answer first, cite as support
+  H: Citation-light QA — explicitly avoid quote-dumping
 """
 
 from __future__ import annotations
 
 import random
+from collections import defaultdict
 from dataclasses import dataclass
 
-from src.constants import SYSTEM_PROMPT, SYSTEM_PROMPT_VARIANTS
+from src.constants import (
+    GENERAL_QA_SYSTEM_PROMPT,
+    GENERAL_QA_SYSTEM_PROMPT_VARIANTS,
+    LOOKUP_SYSTEM_PROMPT_VARIANTS,
+)
 from src.data.parser import Book, Chapter, Verse
 from src.data.templates import (
     TOPIC_KEYWORDS,
     _BOOK_TO_CATEGORY,
     _BOUNDARY_QUESTIONS,
     _CONTEXT_ANSWER_TEMPLATES,
+    _CONTEXT_EXPLANATION_TEMPLATES,
     _CONTEXT_TEMPLATES,
     _FAKE_BOOKS,
     _FAKE_QUERY_TEMPLATES,
+    _GENERAL_SECTION_ANSWER_TEMPLATES,
+    _GENERAL_SECTION_QA_TEMPLATES,
+    _GENERAL_TOPIC_ANSWER_TEMPLATES,
+    _GENERAL_TOPIC_QA_TEMPLATES,
     _IDENTIFICATION_ANSWER_ENRICHED_NO_SECTION,
     _IDENTIFICATION_ANSWER_ENRICHED_WITH_SECTION,
     _IDENTIFICATION_ANSWER_TEMPLATES,
@@ -31,9 +43,11 @@ from src.data.templates import (
     _IDENTIFICATION_TEMPLATES,
     _MAX_SECTION_ANSWER_CHARS,
     _MISSPELLED_BOOKS,
+    _NO_QUOTE_ANSWER_TEMPLATES,
+    _NO_QUOTE_SECTION_QA_TEMPLATES,
+    _NO_QUOTE_TOPIC_QA_TEMPLATES,
     _NON_BIBLE_QUESTIONS_BY_CATEGORY,
     _REFUSAL_MISSPELLED_BOOK,
-    _REFUSAL_NON_BIBLE,
     _REFUSAL_NON_BIBLE_BY_CATEGORY,
     _REFUSAL_NON_BIBLE_GENERIC,
     _REFUSAL_NONEXISTENT_BOOK,
@@ -54,18 +68,25 @@ from src.data.templates import (
 )
 
 _MIN_SAMPLES_PER_BOOK = 30
+_REBALANCE_CAPS = {
+    "A": 3500,
+    "D": 2200,
+    "E": 1800,
+}
 
 
 @dataclass(frozen=True)
 class Sample:
     """A single training sample."""
 
-    sample_type: str  # A, B, C, D, E, F
+    sample_type: str  # A, B, C, D, E, F, G, H
     messages: tuple[dict[str, str], ...]
 
 
 def _make_messages(
-    question: str, answer: str, system_prompt: str = SYSTEM_PROMPT
+    question: str,
+    answer: str,
+    system_prompt: str = GENERAL_QA_SYSTEM_PROMPT,
 ) -> tuple[dict[str, str], ...]:
     """Create a messages tuple in TRL SFT format."""
     return (
@@ -89,6 +110,112 @@ def _collect_all_verses(books: list[Book]) -> list[Verse]:
 def _build_chapter_verse_list(chapter: Chapter) -> list[Verse]:
     """Get all verses in a chapter in order."""
     return [v for s in chapter.sections for v in s.verses]
+
+
+def _lookup_prompt(rng: random.Random) -> str:
+    """Sample a prompt variant for explicit lookup tasks."""
+    return rng.choice(LOOKUP_SYSTEM_PROMPT_VARIANTS)
+
+
+def _general_prompt(rng: random.Random) -> str:
+    """Sample a prompt variant for answer-first QA tasks."""
+    return rng.choice(GENERAL_QA_SYSTEM_PROMPT_VARIANTS)
+
+
+def _make_reference(verse: Verse) -> str:
+    """Format a verse reference."""
+    return f"{verse.book}第{verse.chapter}章第{verse.verse_number}節"
+
+
+def _join_references(verses: list[Verse]) -> str:
+    """Join verse references into concise Traditional Chinese text."""
+    refs = [_make_reference(v) for v in verses]
+    if not refs:
+        return "相關經文"
+    if len(refs) == 1:
+        return refs[0]
+    return "、".join(refs[:-1]) + "與" + refs[-1]
+
+
+def _make_snippet(text: str) -> str:
+    """Extract a meaningful snippet from verse text for summaries."""
+    snippet = _prepare_verse_text(text)
+    if len(snippet) > 36:
+        for sep in ("。", "；", "，"):
+            pos = snippet.find(sep, 14)
+            if pos != -1:
+                snippet = snippet[: pos + 1]
+                break
+        else:
+            snippet = snippet[:36] + "……"
+    return snippet
+
+
+def _pick_support_verses(verses: list[Verse]) -> list[Verse]:
+    """Pick one or two representative verses for concise support."""
+    if not verses:
+        return []
+    if len(verses) == 1:
+        return [verses[0]]
+    return [verses[0], verses[-1]]
+
+
+def _support_points(verses: list[Verse]) -> tuple[str, str]:
+    """Build one or two short support points from verses."""
+    supports = _pick_support_verses(verses)
+    if not supports:
+        return ("這段內容需要回到上下文理解", "可再對照相關經文")
+
+    points = [_make_snippet(v.text) for v in supports]
+    if len(points) == 1:
+        return points[0], points[0]
+    return points[0], points[1]
+
+
+def _build_context_flow(prev: Verse | None, verse: Verse, nxt: Verse | None) -> str:
+    """Convert surrounding verses into a concise contextual summary."""
+    parts = []
+    if prev:
+        parts.append(f"前文提到{_make_snippet(prev.text)}")
+    parts.append(f"本節則說到{_make_snippet(verse.text)}")
+    if nxt:
+        parts.append(f"後文又接著{_make_snippet(nxt.text)}")
+    return "；".join(parts) + "。"
+
+
+def _build_section_summary_text(section_title: str, verses: list[Verse]) -> str:
+    """Build a citation-light summary for a titled section."""
+    point1, point2 = _support_points(verses)
+    if point1 == point2:
+        return f"「{section_title}」這段主要圍繞{point1}"
+    return f"「{section_title}」這段先提到{point1}，後面又延伸到{point2}"
+
+
+def _build_topic_summary_text(topic: str, verses: list[Verse]) -> str:
+    """Build a citation-light summary for a thematic QA sample."""
+    point1, point2 = _support_points(verses)
+    if point1 == point2:
+        return f"聖經談「{topic}」時，常用{point1}這類內容幫助人理解"
+    return f"聖經談「{topic}」時，常會從{point1}與{point2}這些角度來呈現"
+
+
+def _rebalance_samples(samples: list[Sample], seed: int) -> list[Sample]:
+    """Downsample retrieval-heavy tasks so answer-first QA is not drowned out."""
+    indexed_groups: dict[str, list[tuple[int, Sample]]] = defaultdict(list)
+    for idx, sample in enumerate(samples):
+        indexed_groups[sample.sample_type].append((idx, sample))
+
+    rng = random.Random(seed + 1000)
+    keep_indices: set[int] = set()
+    for sample_type, grouped in indexed_groups.items():
+        cap = _REBALANCE_CAPS.get(sample_type)
+        if cap is None or len(grouped) <= cap:
+            keep_indices.update(idx for idx, _ in grouped)
+            continue
+        chosen = rng.sample(grouped, cap)
+        keep_indices.update(idx for idx, _ in chosen)
+
+    return [sample for idx, sample in enumerate(samples) if idx in keep_indices]
 
 
 # --- Type A: Verse Lookup (with downsampling + book floor) ---
@@ -145,7 +272,7 @@ def generate_type_a(books: list[Book], rng: random.Random) -> list[Sample]:
     samples = []
     for verses in sampled_per_book.values():
         for verse in verses:
-            sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+            sys_prompt = _lookup_prompt(rng)
             template = rng.choice(_VERSE_QUERY_TEMPLATES)
             question = template.format(
                 book=verse.book,
@@ -203,7 +330,7 @@ def generate_type_b(books: list[Book], rng: random.Random) -> list[Sample]:
                 if not section.title:
                     continue  # Skip empty section titles
 
-                sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+                sys_prompt = _general_prompt(rng)
                 template = rng.choice(_SECTION_SUMMARY_TEMPLATES)
                 question = template.format(
                     book=book.name,
@@ -320,7 +447,7 @@ def generate_type_c(
             if not available:
                 continue
 
-            sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+            sys_prompt = _lookup_prompt(rng)
             n_show = min(len(available), verses_per_sample)
             selected = rng.sample(available, n_show)
             used_verse_ids.update(id(v) for v in selected)
@@ -356,7 +483,7 @@ def generate_type_c(
             if len(available) < 1:
                 break
 
-            sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+            sys_prompt = _lookup_prompt(rng)
             n_show = min(len(available), verses_per_sample)
             selected = rng.sample(available, n_show)
             used_verse_ids.update(id(v) for v in selected)
@@ -393,7 +520,7 @@ def generate_type_c(
             if len(available) < 2:
                 continue
 
-            sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+            sys_prompt = _lookup_prompt(rng)
             n_show = min(len(available), verses_per_sample)
             selected = rng.sample(available, n_show)
             used_verse_ids.update(id(v) for v in selected)
@@ -439,7 +566,7 @@ def generate_type_d(
 
             for idx in selected_indices:
                 verse = all_verses[idx]
-                sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+                sys_prompt = _general_prompt(rng)
                 template = rng.choice(_CONTEXT_TEMPLATES)
                 question = template.format(
                     book=verse.book,
@@ -448,9 +575,11 @@ def generate_type_d(
                 )
 
                 # Build context: previous, current, next verses
+                prev = all_verses[idx - 1] if idx > 0 else None
+                nxt = all_verses[idx + 1] if idx < len(all_verses) - 1 else None
+
                 parts = []
                 if idx > 0:
-                    prev = all_verses[idx - 1]
                     parts.append(
                         f"前文（第{prev.verse_number}節）：「{_prepare_verse_text(prev.text)}」"
                     )
@@ -460,25 +589,32 @@ def generate_type_d(
                 )
 
                 if idx < len(all_verses) - 1:
-                    nxt = all_verses[idx + 1]
                     parts.append(
                         f"後文（第{nxt.verse_number}節）：「{_prepare_verse_text(nxt.text)}」"
                     )
 
-                context_text = "\n".join(parts)
-                section_info = (
-                    f"\n\n這節經文位於「{verse.section_title}」段落中。"
-                    if verse.section_title
-                    else ""
-                )
-                answer_template = rng.choice(_CONTEXT_ANSWER_TEMPLATES)
-                answer = answer_template.format(
-                    book=verse.book,
-                    chapter=verse.chapter,
-                    verse=verse.verse_number,
-                    context_text=context_text,
-                    section_info=section_info,
-                )
+                if rng.random() < 0.60:
+                    references = [v for v in (prev, verse, nxt) if v is not None]
+                    answer_template = rng.choice(_CONTEXT_EXPLANATION_TEMPLATES)
+                    answer = answer_template.format(
+                        flow_text=_build_context_flow(prev, verse, nxt),
+                        references_text=_join_references(references),
+                    )
+                else:
+                    context_text = "\n".join(parts)
+                    section_info = (
+                        f"\n\n這節經文位於「{verse.section_title}」段落中。"
+                        if verse.section_title
+                        else ""
+                    )
+                    answer_template = rng.choice(_CONTEXT_ANSWER_TEMPLATES)
+                    answer = answer_template.format(
+                        book=verse.book,
+                        chapter=verse.chapter,
+                        verse=verse.verse_number,
+                        context_text=context_text,
+                        section_info=section_info,
+                    )
                 samples.append(
                     Sample(
                         sample_type="D",
@@ -489,20 +625,6 @@ def generate_type_d(
 
 
 # --- Type E: Verse Identification ---
-
-
-def _make_snippet(text: str) -> str:
-    """Extract a meaningful snippet from verse text for identification."""
-    snippet = text
-    if len(snippet) > 50:
-        for sep in ("。", "；", "，"):
-            pos = snippet.find(sep, 20)
-            if pos != -1:
-                snippet = snippet[: pos + 1]
-                break
-        else:
-            snippet = snippet[:50] + "……"
-    return snippet
 
 
 def _normalize_inner_quotes(text: str) -> str:
@@ -564,7 +686,7 @@ def generate_type_e(
 
     samples = []
     for verse in selected:
-        sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+        sys_prompt = _lookup_prompt(rng)
         text_snippet = _make_snippet(verse.text)
 
         # v7: Ensure minimum snippet length
@@ -631,6 +753,120 @@ def generate_type_e(
     return samples
 
 
+# --- Type G: General Bible QA ---
+
+
+def generate_type_g(books: list[Book], rng: random.Random) -> list[Sample]:
+    """Generate answer-first Bible QA samples with supporting references."""
+    samples = []
+
+    for book in books:
+        for chapter in book.chapters:
+            for section in chapter.sections:
+                if not section.title or not section.verses:
+                    continue
+
+                support_verses = _pick_support_verses(list(section.verses))
+                point1, point2 = _support_points(list(section.verses))
+                sys_prompt = _general_prompt(rng)
+                question = rng.choice(_GENERAL_SECTION_QA_TEMPLATES).format(
+                    book=book.name,
+                    chapter=chapter.number,
+                    section=section.title,
+                )
+                answer = rng.choice(_GENERAL_SECTION_ANSWER_TEMPLATES).format(
+                    section=section.title,
+                    point1=point1,
+                    point2=point2,
+                    references_text=_join_references(support_verses),
+                )
+                samples.append(
+                    Sample(
+                        sample_type="G",
+                        messages=_make_messages(question, answer, sys_prompt),
+                    )
+                )
+
+    topic_index = _build_topic_index(books)
+    for topic, verses in topic_index.items():
+        if len(verses) < 2:
+            continue
+
+        support_verses = rng.sample(verses, min(2, len(verses)))
+        point1, point2 = _support_points(support_verses)
+        sys_prompt = _general_prompt(rng)
+        question = rng.choice(_GENERAL_TOPIC_QA_TEMPLATES).format(topic=topic)
+        answer = rng.choice(_GENERAL_TOPIC_ANSWER_TEMPLATES).format(
+            topic=topic,
+            point1=point1,
+            point2=point2,
+            references_text=_join_references(support_verses),
+        )
+        samples.append(
+            Sample(
+                sample_type="G",
+                messages=_make_messages(question, answer, sys_prompt),
+            )
+        )
+
+    return samples
+
+
+# --- Type H: Citation-light Bible QA ---
+
+
+def generate_type_h(books: list[Book], rng: random.Random) -> list[Sample]:
+    """Generate samples that explicitly prefer concise answers over quote dumps."""
+    samples = []
+
+    for book in books:
+        for chapter in book.chapters:
+            for section in chapter.sections:
+                if not section.title or not section.verses:
+                    continue
+
+                support_verses = _pick_support_verses(list(section.verses))
+                sys_prompt = _general_prompt(rng)
+                question = rng.choice(_NO_QUOTE_SECTION_QA_TEMPLATES).format(
+                    book=book.name,
+                    chapter=chapter.number,
+                    section=section.title,
+                )
+                answer = rng.choice(_NO_QUOTE_ANSWER_TEMPLATES).format(
+                    summary_text=_build_section_summary_text(
+                        section.title, list(section.verses)
+                    ),
+                    references_text=_join_references(support_verses),
+                )
+                samples.append(
+                    Sample(
+                        sample_type="H",
+                        messages=_make_messages(question, answer, sys_prompt),
+                    )
+                )
+
+    topic_index = _build_topic_index(books)
+    for topic, verses in topic_index.items():
+        if len(verses) < 2:
+            continue
+
+        support_verses = rng.sample(verses, min(2, len(verses)))
+        sys_prompt = _general_prompt(rng)
+        question = rng.choice(_NO_QUOTE_TOPIC_QA_TEMPLATES).format(topic=topic)
+        answer = rng.choice(_NO_QUOTE_ANSWER_TEMPLATES).format(
+            summary_text=_build_topic_summary_text(topic, support_verses),
+            references_text=_join_references(support_verses),
+        )
+        samples.append(
+            Sample(
+                sample_type="H",
+                messages=_make_messages(question, answer, sys_prompt),
+            )
+        )
+
+    return samples
+
+
 # --- Type F: Refusal / Out-of-scope ---
 
 
@@ -650,7 +886,7 @@ def generate_type_f(
     for fake_book in _FAKE_BOOKS:
         for ch in rng.sample(range(1, 11), 5):
             v = rng.randint(1, 20)
-            sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+            sys_prompt = _general_prompt(rng)
             template = rng.choice(_FAKE_QUERY_TEMPLATES)
             question = template.format(book=fake_book, ch=ch, v=v)
             answer = rng.choice(_REFUSAL_NONEXISTENT_BOOK).format(
@@ -670,7 +906,7 @@ def generate_type_f(
         max_ch = max_chapters[book_name]
         fake_ch = max_ch + rng.randint(1, 50)
         v = rng.randint(1, 30)
-        sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+        sys_prompt = _general_prompt(rng)
         template = rng.choice(_FAKE_QUERY_TEMPLATES)
         question = template.format(book=book_name, ch=fake_ch, v=v)
         answer = rng.choice(_REFUSAL_OUT_OF_RANGE).format(
@@ -700,7 +936,7 @@ def generate_type_f(
         ch = rng.choice(list(ch_map.keys()))
         max_v = ch_map[ch]
         fake_v = max_v + rng.randint(1, 30)
-        sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+        sys_prompt = _general_prompt(rng)
         template = rng.choice(_FAKE_QUERY_TEMPLATES)
         question = template.format(book=book_name, ch=ch, v=fake_v)
         answer = rng.choice(_REFUSAL_OUT_OF_RANGE_VERSE).format(
@@ -717,7 +953,7 @@ def generate_type_f(
     for category, questions in _NON_BIBLE_QUESTIONS_BY_CATEGORY.items():
         cat_templates = _REFUSAL_NON_BIBLE_BY_CATEGORY.get(category)
         for question in questions:
-            sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+            sys_prompt = _general_prompt(rng)
             if cat_templates and rng.random() < 0.60:
                 answer = rng.choice(cat_templates)
             else:
@@ -731,7 +967,7 @@ def generate_type_f(
 
     # --- F4: Ambiguous boundary questions (30) ---
     for question, answer in _BOUNDARY_QUESTIONS:
-        sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+        sys_prompt = _general_prompt(rng)
         samples.append(
             Sample(
                 sample_type="F",
@@ -744,7 +980,7 @@ def generate_type_f(
         for _ in range(5):
             ch = rng.randint(1, 10)
             v = rng.randint(1, 20)
-            sys_prompt = rng.choice(SYSTEM_PROMPT_VARIANTS)
+            sys_prompt = _general_prompt(rng)
             template = rng.choice(_FAKE_QUERY_TEMPLATES)
             question = template.format(book=wrong_name, ch=ch, v=v)
             answer = rng.choice(_REFUSAL_MISSPELLED_BOOK).format(
@@ -768,7 +1004,7 @@ def generate_all_samples(
 ) -> list[Sample]:
     """Generate all training samples from parsed Bible books.
 
-    Returns a list of Sample objects with all 6 types combined.
+    Returns a list of Sample objects with all 8 types combined.
     """
     rng = random.Random(seed)
 
@@ -778,6 +1014,8 @@ def generate_all_samples(
     samples.extend(generate_type_c(books, rng))
     samples.extend(generate_type_d(books, rng))
     samples.extend(generate_type_e(books, rng))
+    samples.extend(generate_type_g(books, rng))
+    samples.extend(generate_type_h(books, rng))
     samples.extend(generate_type_f(books, rng))
 
-    return samples
+    return _rebalance_samples(samples, seed)

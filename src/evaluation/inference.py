@@ -11,7 +11,8 @@ import torch
 from dotenv import load_dotenv
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from src.constants import MODEL_ID, OUTPUT_DIR, SYSTEM_PROMPT
+from src.constants import MODEL_ID, OUTPUT_DIR
+from src.response_policy import GENERAL_QA_MODE, LOOKUP_MODE, get_system_prompt, select_response_mode
 
 
 def _load_model(model_path: str | None = None):
@@ -60,13 +61,15 @@ def generate(
     tokenizer,
     question: str,
     *,
+    mode: str = "auto",
     temperature: float = 0.7,
     top_p: float = 0.9,
     max_new_tokens: int = 512,
 ) -> str:
     """Generate a response to a question."""
+    response_mode = select_response_mode(question) if mode == "auto" else mode
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_system_prompt(response_mode)},
         {"role": "user", "content": question},
     ]
     input_text = tokenizer.apply_chat_template(
@@ -97,7 +100,7 @@ def repl(model_path: str | None = None) -> None:
     print("聖經知識助手 — 互動模式")
     print("=" * 60)
     print("輸入問題開始對話，輸入 'quit' 退出")
-    print("可調參數: temperature=0.7, top_p=0.9, max_new_tokens=512")
+    print("可調參數: temperature=0.7, top_p=0.9, max_new_tokens=512, mode=auto")
     print("-" * 60)
 
     model, tokenizer = _load_model(model_path)
@@ -105,6 +108,7 @@ def repl(model_path: str | None = None) -> None:
     temperature = 0.7
     top_p = 0.9
     max_new_tokens = 512
+    mode = "auto"
 
     while True:
         try:
@@ -134,6 +138,12 @@ def repl(model_path: str | None = None) -> None:
                 elif param == "max_new_tokens":
                     max_new_tokens = int(value)
                     print(f"  max_new_tokens = {max_new_tokens}")
+                elif param == "mode":
+                    if value not in ("auto", GENERAL_QA_MODE, LOOKUP_MODE):
+                        print(f"  未知 mode: {value}")
+                    else:
+                        mode = value
+                        print(f"  mode = {mode}")
                 else:
                     print(f"  未知參數: {param}")
             continue
@@ -142,6 +152,7 @@ def repl(model_path: str | None = None) -> None:
             model,
             tokenizer,
             user_input,
+            mode=mode,
             temperature=temperature,
             top_p=top_p,
             max_new_tokens=max_new_tokens,

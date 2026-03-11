@@ -101,6 +101,19 @@ _SECTION_ANSWER_TEMPLATES = (
     "{book}第{chapter}章「{section}」的段落經文如下所示：\n\n{verses_text}",
 )
 
+_GENERAL_SECTION_QA_TEMPLATES = (
+    "{book}第{chapter}章「{section}」這段主要想傳達什麼？",
+    "如果不用逐字貼經文，怎麼白話說明{book}第{chapter}章「{section}」的重點？",
+    "請先直接回答{book}第{chapter}章「{section}」這段的核心意思。",
+    "{book}第{chapter}章「{section}」這段對讀者的提醒是什麼？",
+)
+
+_GENERAL_SECTION_ANSWER_TEMPLATES = (
+    "這一段主要圍繞「{section}」。從內容來看，可以先抓住{point1}，接著{point2}，所以整段是在鋪陳這個重點。若要對照原文，可參考{references_text}。",
+    "簡單說，「{section}」這段不是單純堆疊經文，而是在說明{point1}，後面又延伸到{point2}。需要回頭查原文時，可參考{references_text}。",
+    "如果先用重點整理，這段的核心是「{section}」所呈現的主題：{point1}；另外{point2}。相關經文可參考{references_text}。",
+)
+
 # --- Type D: Context Understanding templates ---
 
 _CONTEXT_TEMPLATES = (
@@ -140,6 +153,12 @@ _CONTEXT_ANSWER_TEMPLATES = (
     "{book}{chapter}章{verse}節出現在以下段落之中：\n\n{context_text}{section_info}",
     "關於{book}第{chapter}章第{verse}節的段落背景：\n\n{context_text}{section_info}",
     "好的，以下是{book}第{chapter}章第{verse}節附近的經文內容：\n\n{context_text}{section_info}",
+)
+
+_CONTEXT_EXPLANATION_TEMPLATES = (
+    "把這節放回整段來看，重點不是單看一句，而是要連同前後文理解。{flow_text}若要回頭對照原文，可參考{references_text}。",
+    "若只看單節，很容易忽略脈絡。比較合適的理解方式是把它放在整段裡看：{flow_text}相關章節可參考{references_text}。",
+    "這節經文要放在上下文中理解。{flow_text}因此回答時可以先抓整段意思，再視需要查回{references_text}。",
 )
 
 # --- Type E: Verse Identification templates ---
@@ -237,6 +256,37 @@ _THEMATIC_ANSWER_TEMPLATES = (
     "聖經裏提到「{topic}」的經文有：\n\n{verse_lines}",
     "好的，以下是與「{topic}」相關的聖經經文：\n\n{verse_lines}",
     "為您整理聖經中關於「{topic}」的經文如下：\n\n{verse_lines}",
+)
+
+_GENERAL_TOPIC_QA_TEMPLATES = (
+    "聖經如何看待「{topic}」？",
+    "如果先不用逐字引用經文，聖經對「{topic}」的重點是什麼？",
+    "用簡單的話說，聖經怎麼談「{topic}」？",
+    "關於「{topic}」，請先直接回答重點，再視需要補充經文。",
+)
+
+_GENERAL_TOPIC_ANSWER_TEMPLATES = (
+    "簡單說，聖經談到「{topic}」時，會從不同段落反覆強調這個主題。像{point1}；另外{point2}。如果要進一步查考，可參考{references_text}。",
+    "若先抓核心重點，聖經對「{topic}」的呈現不只是一句話，而是多處內容互相呼應，例如{point1}，也可以看到{point2}。相關經文可參考{references_text}。",
+    "直接回答的話，「{topic}」在聖經中是一個反覆出現的主題。從{point1}和{point2}這些內容，可以先掌握大方向；需要時再對照{references_text}。",
+)
+
+_NO_QUOTE_TOPIC_QA_TEMPLATES = (
+    "請不要整段引用經文，直接告訴我聖經如何看待「{topic}」。",
+    "不用貼一大段經文，請先用重點回答「{topic}」在聖經中的意思。",
+    "先不要逐字查經文，請用白話說明聖經怎麼談「{topic}」。",
+)
+
+_NO_QUOTE_SECTION_QA_TEMPLATES = (
+    "不用整段貼經文，請直接說明{book}第{chapter}章「{section}」這段要表達什麼。",
+    "請不要先大量引用原文，直接整理{book}第{chapter}章「{section}」這段的重點。",
+    "如果先不逐字查經文，{book}第{chapter}章「{section}」這段可以怎麼白話解釋？",
+)
+
+_NO_QUOTE_ANSWER_TEMPLATES = (
+    "如果不逐字引用，這段的重點可以先這樣理解：{summary_text}。需要回頭查經文時，可再看{references_text}。",
+    "先用白話說，重點是{summary_text}。若要補充原文，可參考{references_text}。",
+    "直接回答的話，核心在於{summary_text}；經文可作為輔助，建議對照{references_text}。",
 )
 
 _THEMATIC_CATEGORY_ANSWER_TEMPLATES = (
