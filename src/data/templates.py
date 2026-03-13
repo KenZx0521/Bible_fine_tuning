@@ -88,12 +88,12 @@ _SECTION_SUMMARY_TEMPLATES = (
 )
 
 _SECTION_SUMMARY_ANSWER_TEMPLATES = (
-    "簡單說，{book}第{chapter}章「{section}」這段主要在談{summary_text}。若要回頭對照原文，可參考{reference_span}。",
-    "{book}第{chapter}章「{section}」這段的核心可以先抓成：{summary_text}。相關經文大致落在{reference_span}。",
-    "如果先用重點整理，{book}第{chapter}章「{section}」這段是在說{summary_text}；需要查原文時，再對照{reference_span}即可。",
-    "{book}第{chapter}章「{section}」這段內容不是要逐節背誦，而是要先理解重點：{summary_text}。原文可參考{reference_span}。",
-    "白話整理的話，{book}第{chapter}章「{section}」這段圍繞的是{summary_text}。經文範圍可對照{reference_span}。",
-    "先抓核心意思的話，{book}第{chapter}章「{section}」這段是在談{summary_text}。若需要逐字查考，再回到{reference_span}。",
+    "{book}第{chapter}章「{section}」這段{summary_text}。其中{key_verse_ref}提到「{key_verse_snippet}」，可以看出這段的核心信息。",
+    "簡單說，{book}第{chapter}章「{section}」{summary_text}。像{key_verse_ref}就記載「{key_verse_snippet}」，點出了這段的主旨。",
+    "{book}第{chapter}章「{section}」{summary_text}。經文{reference_span}中，{key_verse_ref}特別提到「{key_verse_snippet}」。",
+    "整理一下，{book}第{chapter}章「{section}」{summary_text}。從{key_verse_ref}的「{key_verse_snippet}」可以清楚看出重點所在。",
+    "白話來說，{book}第{chapter}章「{section}」{summary_text}。{key_verse_ref}說「{key_verse_snippet}」，就是這段的精髓。",
+    "{book}第{chapter}章「{section}」{summary_text}。這些記載在{reference_span}，其中{key_verse_ref}尤其關鍵。",
 )
 
 # Backward-compatible alias for older tests/imports.
@@ -107,9 +107,10 @@ _GENERAL_SECTION_QA_TEMPLATES = (
 )
 
 _GENERAL_SECTION_ANSWER_TEMPLATES = (
-    "這一段主要圍繞「{section}」。從內容來看，可以先抓住{point1}，接著{point2}，所以整段是在鋪陳這個重點。若要對照原文，可參考{references_text}。",
-    "簡單說，「{section}」這段不是單純堆疊經文，而是在說明{point1}，後面又延伸到{point2}。需要回頭查原文時，可參考{references_text}。",
-    "如果先用重點整理，這段的核心是「{section}」所呈現的主題：{point1}；另外{point2}。相關經文可參考{references_text}。",
+    "「{section}」這段的核心是{point1}，接著帶出{point2}。正如{key_verse_ref}所記「{key_verse_snippet}」，清楚表達了這段的主旨。",
+    "簡單說，「{section}」這段在說明{point1}，並延伸到{point2}。{key_verse_ref}寫道「{key_verse_snippet}」，就是最好的例證。",
+    "「{section}」這段的重點是{point1}，以及{point2}。像{key_verse_ref}提到「{key_verse_snippet}」，把整段的意思說得很清楚。",
+    "整理來看，「{section}」呈現的主題是{point1}，另外{point2}也是重要面向。經文{references_text}中有詳細的記載。",
 )
 
 # --- Type D: Context Understanding templates ---
@@ -154,9 +155,10 @@ _CONTEXT_ANSWER_TEMPLATES = (
 )
 
 _CONTEXT_EXPLANATION_TEMPLATES = (
-    "把這節放回整段來看，重點不是單看一句，而是要連同前後文理解。{flow_text}若要回頭對照原文，可參考{references_text}。",
-    "若只看單節，很容易忽略脈絡。比較合適的理解方式是把它放在整段裡看：{flow_text}相關章節可參考{references_text}。",
-    "這節經文要放在上下文中理解。{flow_text}因此回答時可以先抓整段意思，再視需要查回{references_text}。",
+    "把這節放回整段來看，{flow_text}從前後文可以看出這節在整段敘事中的位置。相關經文記載在{references_text}。",
+    "要理解這節經文的完整意思，需要看前後文脈絡：{flow_text}出處為{references_text}。",
+    "這節經文的脈絡如下：{flow_text}整段記載在{references_text}中，前後連貫閱讀會更清楚。",
+    "結合上下文來看，{flow_text}這些經文記載在{references_text}，構成了完整的敘事。",
 )
 
 # --- Type E: Verse Identification templates ---
@@ -264,9 +266,10 @@ _GENERAL_TOPIC_QA_TEMPLATES = (
 )
 
 _GENERAL_TOPIC_ANSWER_TEMPLATES = (
-    "簡單說，聖經談到「{topic}」時，會從不同段落反覆強調這個主題。像{point1}；另外{point2}。如果要進一步查考，可參考{references_text}。",
-    "若先抓核心重點，聖經對「{topic}」的呈現不只是一句話，而是多處內容互相呼應，例如{point1}，也可以看到{point2}。相關經文可參考{references_text}。",
-    "直接回答的話，「{topic}」在聖經中是一個反覆出現的主題。從{point1}和{point2}這些內容，可以先掌握大方向；需要時再對照{references_text}。",
+    "聖經談到「{topic}」時，{point1}，同時也強調{point2}。例如{key_verse_ref}說「{key_verse_snippet}」，就體現了這個主題。",
+    "關於「{topic}」，聖經的教導涉及{point1}以及{point2}。像{key_verse_ref}記載「{key_verse_snippet}」，是很有代表性的經文。",
+    "「{topic}」在聖經中是一個重要主題。核心包括{point1}和{point2}，{key_verse_ref}的「{key_verse_snippet}」正是典型的例子。",
+    "直接回答的話，聖經對「{topic}」的教導圍繞{point1}以及{point2}。{key_verse_ref}提到「{key_verse_snippet}」，可作為理解的起點。",
 )
 
 _NO_QUOTE_TOPIC_QA_TEMPLATES = (
@@ -282,9 +285,10 @@ _NO_QUOTE_SECTION_QA_TEMPLATES = (
 )
 
 _NO_QUOTE_ANSWER_TEMPLATES = (
-    "如果不逐字引用，這段的重點可以先這樣理解：{summary_text}。需要回頭查經文時，可再看{references_text}。",
-    "先用白話說，重點是{summary_text}。若要補充原文，可參考{references_text}。",
-    "直接回答的話，核心在於{summary_text}；經文可作為輔助，建議對照{references_text}。",
+    "不逐字引用的話，這段重點是{summary_text}。相關記載在{references_text}。",
+    "白話來說，重點是{summary_text}，這些內容記載在{references_text}中。",
+    "直接回答的話，核心在於{summary_text}。經文出處為{references_text}。",
+    "簡單整理，{summary_text}。這些都可以在{references_text}找到。",
 )
 
 _THEMATIC_CATEGORY_ANSWER_TEMPLATES = (

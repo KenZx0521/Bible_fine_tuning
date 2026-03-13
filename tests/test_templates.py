@@ -7,15 +7,19 @@ from src.data.templates import (
     _BOOK_TO_CATEGORY,
     _BOUNDARY_QUESTIONS,
     _CONTEXT_ANSWER_TEMPLATES,
+    _CONTEXT_EXPLANATION_TEMPLATES,
     _CONTEXT_TEMPLATES,
     _FAKE_BOOKS,
     _FAKE_QUERY_TEMPLATES,
+    _GENERAL_SECTION_ANSWER_TEMPLATES,
+    _GENERAL_TOPIC_ANSWER_TEMPLATES,
     _IDENTIFICATION_ANSWER_ENRICHED_NO_SECTION,
     _IDENTIFICATION_ANSWER_ENRICHED_WITH_SECTION,
     _IDENTIFICATION_ANSWER_TEMPLATES,
     _IDENTIFICATION_ANSWER_WITH_SECTION_TEMPLATES,
     _IDENTIFICATION_TEMPLATES,
     _MISSPELLED_BOOKS,
+    _NO_QUOTE_ANSWER_TEMPLATES,
     _NON_BIBLE_QUESTIONS,
     _NON_BIBLE_QUESTIONS_BY_CATEGORY,
     _REFUSAL_MISSPELLED_BOOK,
@@ -191,7 +195,7 @@ class TestTemplatePlaceholders:
             assert "{chapter}" in tmpl, f"Missing {{chapter}} in: {tmpl}"
             assert "{section}" in tmpl, f"Missing {{section}} in: {tmpl}"
             assert "{summary_text}" in tmpl, f"Missing {{summary_text}} in: {tmpl}"
-            assert "{reference_span}" in tmpl, f"Missing {{reference_span}} in: {tmpl}"
+            assert "{key_verse_ref}" in tmpl, f"Missing {{key_verse_ref}} in: {tmpl}"
 
     def test_context_placeholders(self):
         for tmpl in _CONTEXT_TEMPLATES:
@@ -438,3 +442,83 @@ class TestNonBibleCategories:
             assert len(templates) >= 2, (
                 f"Category '{cat}' has only {len(templates)} refusal templates"
             )
+
+
+# --- v10: Answer quality template tests ---
+
+
+class TestNoPassBuckInTemplates:
+    """Verify templates don't contain pass-buck phrases (v10)."""
+
+    _PASS_BUCK_PHRASES = (
+        "若要回頭對照原文",
+        "若要對照原文",
+        "需要回頭查原文時",
+        "再視需要查回",
+        "若需要逐字查考",
+    )
+
+    def test_section_summary_answer_no_pass_buck(self):
+        for tmpl in _SECTION_SUMMARY_ANSWER_TEMPLATES:
+            for phrase in self._PASS_BUCK_PHRASES:
+                assert phrase not in tmpl, f"Pass-buck in section answer: {tmpl[:60]}"
+
+    def test_general_section_answer_no_pass_buck(self):
+        for tmpl in _GENERAL_SECTION_ANSWER_TEMPLATES:
+            for phrase in self._PASS_BUCK_PHRASES:
+                assert phrase not in tmpl, f"Pass-buck in G section answer: {tmpl[:60]}"
+
+    def test_general_topic_answer_no_pass_buck(self):
+        for tmpl in _GENERAL_TOPIC_ANSWER_TEMPLATES:
+            for phrase in self._PASS_BUCK_PHRASES:
+                assert phrase not in tmpl, f"Pass-buck in G topic answer: {tmpl[:60]}"
+
+    def test_no_quote_answer_no_pass_buck(self):
+        for tmpl in _NO_QUOTE_ANSWER_TEMPLATES:
+            for phrase in self._PASS_BUCK_PHRASES:
+                assert phrase not in tmpl, f"Pass-buck in H answer: {tmpl[:60]}"
+
+    def test_context_explanation_no_pass_buck(self):
+        for tmpl in _CONTEXT_EXPLANATION_TEMPLATES:
+            for phrase in self._PASS_BUCK_PHRASES:
+                assert phrase not in tmpl, f"Pass-buck in D explanation: {tmpl[:60]}"
+
+
+class TestNewTemplatePlaceholders:
+    """Verify v10 new template placeholders are correct."""
+
+    def test_general_section_answer_has_key_verse(self):
+        for tmpl in _GENERAL_SECTION_ANSWER_TEMPLATES:
+            assert "{section}" in tmpl, f"Missing {{section}} in: {tmpl[:60]}"
+            assert "{point1}" in tmpl, f"Missing {{point1}} in: {tmpl[:60]}"
+
+    def test_general_topic_answer_has_key_verse(self):
+        for tmpl in _GENERAL_TOPIC_ANSWER_TEMPLATES:
+            assert "{topic}" in tmpl, f"Missing {{topic}} in: {tmpl[:60]}"
+            assert "{point1}" in tmpl, f"Missing {{point1}} in: {tmpl[:60]}"
+
+    def test_context_explanation_has_flow_and_refs(self):
+        for tmpl in _CONTEXT_EXPLANATION_TEMPLATES:
+            assert "{flow_text}" in tmpl, f"Missing {{flow_text}} in: {tmpl[:60]}"
+            assert "{references_text}" in tmpl, f"Missing {{references_text}} in: {tmpl[:60]}"
+
+    def test_no_quote_answer_has_summary_and_refs(self):
+        for tmpl in _NO_QUOTE_ANSWER_TEMPLATES:
+            assert "{summary_text}" in tmpl, f"Missing {{summary_text}} in: {tmpl[:60]}"
+            assert "{references_text}" in tmpl, f"Missing {{references_text}} in: {tmpl[:60]}"
+
+
+class TestNewTemplateCounts:
+    """Verify v10 template counts meet minimum requirements."""
+
+    def test_context_explanation_min_4(self):
+        assert len(_CONTEXT_EXPLANATION_TEMPLATES) >= 4
+
+    def test_general_section_answer_min_4(self):
+        assert len(_GENERAL_SECTION_ANSWER_TEMPLATES) >= 4
+
+    def test_general_topic_answer_min_4(self):
+        assert len(_GENERAL_TOPIC_ANSWER_TEMPLATES) >= 4
+
+    def test_no_quote_answer_min_4(self):
+        assert len(_NO_QUOTE_ANSWER_TEMPLATES) >= 4

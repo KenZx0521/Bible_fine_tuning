@@ -99,17 +99,21 @@ class TestTypeB:
         rng = random.Random(42)
         samples = generate_type_b(sample_books, rng)
         answer = samples[0].messages[2]["content"]
-        assert "查考" in answer or "對照" in answer or "參考" in answer
+        # Answer should be summary-oriented, not a full verse dump
         assert "第1節：" not in answer
+        # Should NOT contain the old "推託" pattern
+        assert "若要回頭對照原文" not in answer
 
     def test_uses_answer_templates(self, sample_books):
-        """Verify Type B uses varied answer templates."""
+        """Verify Type B uses varied answer templates with real content."""
         rng = random.Random(42)
         samples = generate_type_b(sample_books, rng)
         answers = [s.messages[2]["content"] for s in samples]
-        # All answers should remain summary-oriented
+        # All answers should contain the book name and section name
         for a in answers:
-            assert "這段" in a or "核心" in a or "重點" in a or "白話整理" in a
+            assert "創世記" in a
+            # Should NOT contain old "推託" pattern
+            assert "若要回頭對照原文" not in a
 
 
 class TestTypeC:
@@ -271,10 +275,13 @@ class TestTypeG:
         sample = generate_type_g(sample_books, rng)[0]
         assert sample.messages[0]["content"] in GENERAL_QA_SYSTEM_PROMPT_VARIANTS
 
-    def test_answer_mentions_support_reference(self, sample_books):
+    def test_answer_mentions_verse_content(self, sample_books):
         rng = random.Random(42)
         answers = [s.messages[2]["content"] for s in generate_type_g(sample_books, rng)]
-        assert any("可參考" in a or "相關經文" in a for a in answers)
+        # New templates embed verse snippets directly in the answer
+        assert any("提到" in a or "記載" in a or "寫道" in a or "說" in a for a in answers)
+        # Should NOT contain old "推託" pattern
+        assert all("若要對照原文" not in a for a in answers)
 
 
 class TestTypeH:
@@ -1119,4 +1126,198 @@ class TestF3CategoryMatching:
         f3_count = sum(1 for s in samples if s.messages[1]["content"] in all_nb)
         assert f3_count == len(_NON_BIBLE_QUESTIONS), (
             f"F3 count {f3_count} != expected {len(_NON_BIBLE_QUESTIONS)}"
+        )
+
+
+# --- v10: Answer quality improvement tests ---
+
+
+class TestSummaryTemplateDiversity:
+    """Tests for v10 diverse summary text generation."""
+
+    def test_section_summary_diversity(self):
+        """_build_section_summary_text should produce diverse outputs."""
+        from src.data.dataset_generator import _build_section_summary_text
+        from src.data.parser import Verse
+
+        verses = [
+            Verse("創世記", 1, "1", "起初上帝創造天地，地是空虛混沌", "段落"),
+            Verse("創世記", 1, "2", "上帝說要有光就有了光。上帝看光是好的", "段落"),
+            Verse("創世記", 1, "3", "上帝稱光為晝，稱暗為夜，有晚上有早晨", "段落"),
+        ]
+        results = set()
+        for seed in range(50):
+            rng = random.Random(seed)
+            results.add(_build_section_summary_text("段落", verses, rng))
+        assert len(results) >= 4, (
+            f"Only {len(results)} unique summaries in 50 seeds, expected >=4"
+        )
+
+    def test_topic_summary_diversity(self):
+        """_build_topic_summary_text should produce diverse outputs."""
+        from src.data.dataset_generator import _build_topic_summary_text
+        from src.data.parser import Verse
+
+        verses = [
+            Verse("創世記", 1, "1", "信心和相信是重要的", "段落"),
+            Verse("創世記", 1, "2", "信靠主就得平安。相信上帝的應許", "段落"),
+        ]
+        results = set()
+        for seed in range(50):
+            rng = random.Random(seed)
+            results.add(_build_topic_summary_text("信心", verses, rng))
+        assert len(results) >= 4, (
+            f"Only {len(results)} unique topic summaries in 50 seeds, expected >=4"
+        )
+
+
+class TestSupportPointLength:
+    """Tests for v10 support point improvements."""
+
+    def test_support_point_max_50_chars(self):
+        """Support points should be at most 50 chars (up from 18)."""
+        from src.data.dataset_generator import _make_support_point
+
+        text = "起初上帝創造天地，地是空虛混沌，淵面黑暗，上帝的靈運行在水面上。"
+        point = _make_support_point(text)
+        assert len(point) <= 50
+        assert len(point) > 18  # Verify it actually uses more space now
+
+    def test_support_point_finds_natural_break(self):
+        """Support point should break at natural sentence boundaries."""
+        from src.data.dataset_generator import _make_support_point
+
+        text = "上帝看光是好的，就把光暗分開了。上帝稱光為晝。"
+        point = _make_support_point(text)
+        # Should break at the first 。 after 12 chars
+        assert point.endswith("分開了") or point.endswith("晝")
+
+
+class TestPickSupportVerses:
+    """Tests for v10 improved verse selection."""
+
+    def test_picks_up_to_3(self):
+        """_pick_support_verses should pick up to 3 verses."""
+        from src.data.dataset_generator import _pick_support_verses
+        from src.data.parser import Verse
+
+        verses = [
+            Verse("測試", 1, str(i), f"第{i}節" * 10, "段落")
+            for i in range(1, 10)
+        ]
+        picked = _pick_support_verses(verses)
+        assert len(picked) == 3
+
+    def test_prefers_longer_verses(self):
+        """_pick_support_verses should prefer longer (richer) verses."""
+        from src.data.dataset_generator import _pick_support_verses
+        from src.data.parser import Verse
+
+        verses = [
+            Verse("測試", 1, "1", "短", "段落"),
+            Verse("測試", 1, "2", "這是一段非常長的經文內容用來測試選擇邏輯", "段落"),
+            Verse("測試", 1, "3", "短短", "段落"),
+            Verse("測試", 1, "4", "這是另一段很長的經文內容用來測試第四節", "段落"),
+        ]
+        picked = _pick_support_verses(verses)
+        picked_nums = [v.verse_number for v in picked]
+        assert "2" in picked_nums
+        assert "4" in picked_nums
+
+
+class TestNoPassBuckAnswers:
+    """Tests for v10 removal of 推託 patterns."""
+
+    _PASS_BUCK_PHRASES = (
+        "若要回頭對照原文",
+        "若要對照原文",
+        "需要回頭查原文時",
+        "再視需要查回",
+        "若需要逐字查考",
+    )
+
+    def test_type_b_no_pass_buck(self, sample_books):
+        """Type B answers should not use pass-buck phrases."""
+        rng = random.Random(42)
+        for s in generate_type_b(sample_books, rng):
+            answer = s.messages[2]["content"]
+            for phrase in self._PASS_BUCK_PHRASES:
+                assert phrase not in answer, (
+                    f"Pass-buck phrase '{phrase}' in Type B: {answer[:80]}"
+                )
+
+    def test_type_g_no_pass_buck(self, sample_books):
+        """Type G answers should not use pass-buck phrases."""
+        rng = random.Random(42)
+        for s in generate_type_g(sample_books, rng):
+            answer = s.messages[2]["content"]
+            for phrase in self._PASS_BUCK_PHRASES:
+                assert phrase not in answer, (
+                    f"Pass-buck phrase '{phrase}' in Type G: {answer[:80]}"
+                )
+
+    def test_type_h_no_pass_buck(self, sample_books):
+        """Type H answers should not use pass-buck phrases."""
+        rng = random.Random(42)
+        for s in generate_type_h(sample_books, rng):
+            answer = s.messages[2]["content"]
+            for phrase in self._PASS_BUCK_PHRASES:
+                assert phrase not in answer, (
+                    f"Pass-buck phrase '{phrase}' in Type H: {answer[:80]}"
+                )
+
+    def test_type_d_no_pass_buck(self, sample_books):
+        """Type D answers should not use pass-buck phrases."""
+        rng = random.Random(42)
+        for s in generate_type_d(sample_books, rng):
+            answer = s.messages[2]["content"]
+            for phrase in self._PASS_BUCK_PHRASES:
+                assert phrase not in answer, (
+                    f"Pass-buck phrase '{phrase}' in Type D: {answer[:80]}"
+                )
+
+
+class TestTypeGEmbeddedContent:
+    """Tests for v10 Type G/B answers with embedded verse content."""
+
+    def test_type_b_embeds_verse_snippet(self, sample_books):
+        """Type B answers should contain actual verse content."""
+        rng = random.Random(42)
+        samples = generate_type_b(sample_books, rng)
+        for s in samples:
+            answer = s.messages[2]["content"]
+            # New templates embed key_verse_snippet from actual verse text
+            assert "「" in answer, (
+                f"Type B answer missing embedded verse quote: {answer[:80]}"
+            )
+
+    def test_type_g_section_embeds_verse(self, sample_books):
+        """Type G section answers should reference specific verse content."""
+        rng = random.Random(42)
+        samples = generate_type_g(sample_books, rng)
+        section_answers = [
+            s.messages[2]["content"] for s in samples
+            if "「" in s.messages[2]["content"]
+        ]
+        assert len(section_answers) > 0, "No Type G answers contain verse quotes"
+
+
+class TestContextFlowDiversity:
+    """Tests for v10 diverse context flow phrases."""
+
+    def test_flow_phrase_variety(self, sample_books):
+        """_build_context_flow should produce varied phrasing."""
+        from src.data.dataset_generator import _build_context_flow
+        from src.data.parser import Verse
+
+        prev = Verse("創世記", 1, "1", "起初上帝創造天地", "段落")
+        curr = Verse("創世記", 1, "2", "上帝說要有光就有了光", "段落")
+        nxt = Verse("創世記", 1, "3", "上帝稱光為晝稱暗為夜", "段落")
+
+        results = set()
+        for seed in range(50):
+            rng = random.Random(seed)
+            results.add(_build_context_flow(prev, curr, nxt, rng))
+        assert len(results) >= 3, (
+            f"Only {len(results)} unique flow texts in 50 seeds, expected >=3"
         )

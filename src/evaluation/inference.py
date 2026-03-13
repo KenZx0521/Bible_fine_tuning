@@ -62,9 +62,10 @@ def generate(
     question: str,
     *,
     mode: str = "auto",
-    temperature: float = 0.0,
-    top_p: float = 1.0,
-    max_new_tokens: int = 256,
+    temperature: float = 0.3,
+    top_p: float = 0.9,
+    max_new_tokens: int = 512,
+    repetition_penalty: float = 1.15,
 ) -> str:
     """Generate a response to a question."""
     response_mode = select_response_mode(question) if mode == "auto" else mode
@@ -81,6 +82,7 @@ def generate(
         "max_new_tokens": max_new_tokens,
         "pad_token_id": tokenizer.pad_token_id,
         "eos_token_id": tokenizer.eos_token_id,
+        "repetition_penalty": repetition_penalty,
     }
     if temperature > 0:
         generate_kwargs["do_sample"] = True
@@ -106,14 +108,15 @@ def repl(model_path: str | None = None) -> None:
     print("聖經知識助手 — 互動模式")
     print("=" * 60)
     print("輸入問題開始對話，輸入 'quit' 退出")
-    print("可調參數: temperature=0.0, top_p=1.0, max_new_tokens=256, mode=auto")
+    print("可調參數: temperature=0.3, top_p=0.9, max_new_tokens=512, repetition_penalty=1.15, mode=auto")
     print("-" * 60)
 
     model, tokenizer = _load_model(model_path)
 
-    temperature = 0.0
-    top_p = 1.0
-    max_new_tokens = 256
+    temperature = 0.3
+    top_p = 0.9
+    max_new_tokens = 512
+    repetition_penalty = 1.15
     mode = "auto"
 
     while True:
@@ -144,6 +147,9 @@ def repl(model_path: str | None = None) -> None:
                 elif param == "max_new_tokens":
                     max_new_tokens = int(value)
                     print(f"  max_new_tokens = {max_new_tokens}")
+                elif param == "repetition_penalty":
+                    repetition_penalty = float(value)
+                    print(f"  repetition_penalty = {repetition_penalty}")
                 elif param == "mode":
                     if value not in ("auto", GENERAL_QA_MODE, LOOKUP_MODE):
                         print(f"  未知 mode: {value}")
@@ -162,6 +168,7 @@ def repl(model_path: str | None = None) -> None:
             temperature=temperature,
             top_p=top_p,
             max_new_tokens=max_new_tokens,
+            repetition_penalty=repetition_penalty,
         )
         print(f"\n助手: {response}")
 

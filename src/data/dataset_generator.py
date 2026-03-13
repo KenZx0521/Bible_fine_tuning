@@ -150,41 +150,57 @@ def _make_snippet(text: str) -> str:
     return snippet
 
 
-def _make_support_point(text: str, max_chars: int = 18) -> str:
-    """Compress verse text into a short support point for answer-first QA."""
+def _make_support_point(text: str, max_chars: int = 50) -> str:
+    """Compress verse text into a meaningful support point for answer-first QA."""
     point = _prepare_verse_text(text)
     for token in ("「", "」", "『", "』", "\n"):
         point = point.replace(token, "")
     point = point.strip("。；，：、 ")
-    for sep in ("。", "；", "，", "："):
-        pos = point.find(sep, 8)
-        if pos != -1:
+    # Try to find a natural break point after at least 12 chars
+    for sep in ("。", "；"):
+        pos = point.find(sep, 12)
+        if pos != -1 and pos <= max_chars:
             point = point[:pos]
             break
+    else:
+        # If no sentence break, try comma after 20 chars
+        for sep in ("，", "："):
+            pos = point.find(sep, 20)
+            if pos != -1 and pos <= max_chars:
+                point = point[:pos]
+                break
     if len(point) > max_chars:
         point = point[:max_chars].rstrip("；，：、 ")
     return point or "這段重點"
 
 
-def _pick_support_verses(verses: list[Verse]) -> list[Verse]:
-    """Pick one or two representative verses for concise support."""
+def _pick_support_verses(verses: list[Verse], max_picks: int = 3) -> list[Verse]:
+    """Pick up to *max_picks* representative verses for concise support.
+
+    Strategy: sort by text length (longer verses tend to be richer),
+    then pick the top candidates, preferring spread across the section.
+    """
     if not verses:
         return []
     if len(verses) == 1:
         return [verses[0]]
-    return [verses[0], verses[-1]]
+    if len(verses) <= max_picks:
+        return list(verses)
+    # Sort by text length descending; pick the richest verses
+    ranked = sorted(enumerate(verses), key=lambda iv: len(iv[1].text), reverse=True)
+    # Take top candidates but keep them in original order
+    chosen_indices = sorted(idx for idx, _ in ranked[:max_picks])
+    return [verses[i] for i in chosen_indices]
 
 
-def _support_points(verses: list[Verse]) -> tuple[str, str]:
-    """Build one or two short support points from verses."""
+def _support_points(verses: list[Verse]) -> tuple[str, ...]:
+    """Build up to three support points from representative verses."""
     supports = _pick_support_verses(verses)
     if not supports:
-        return ("這段內容需要回到上下文理解", "可再對照相關經文")
+        return ("這段內容需要回到上下文理解",)
 
     points = [_make_support_point(v.text) for v in supports]
-    if len(points) == 1:
-        return points[0], points[0]
-    return points[0], points[1]
+    return tuple(points)
 
 
 def _make_reference_span(verses: list[Verse]) -> str:
@@ -210,31 +226,87 @@ def _make_reference_span(verses: list[Verse]) -> str:
     return f"{_make_reference(first)}至{_make_reference(last)}"
 
 
-def _build_context_flow(prev: Verse | None, verse: Verse, nxt: Verse | None) -> str:
+_FLOW_PREV_PHRASES = ("前文提到", "前一節記載", "在這之前，經文談到")
+_FLOW_CURR_PHRASES = ("本節則說到", "本節的重點是", "這節經文說的是")
+_FLOW_NEXT_PHRASES = ("後文又接著", "接下來提到", "下一節則延續到")
+
+
+def _build_context_flow(
+    prev: Verse | None, verse: Verse, nxt: Verse | None,
+    rng: random.Random | None = None,
+) -> str:
     """Convert surrounding verses into a concise contextual summary."""
+    if rng is None:
+        rng = random.Random()
     parts = []
     if prev:
-        parts.append(f"前文提到{_make_snippet(prev.text)}")
-    parts.append(f"本節則說到{_make_snippet(verse.text)}")
+        parts.append(f"{rng.choice(_FLOW_PREV_PHRASES)}{_make_snippet(prev.text)}")
+    parts.append(f"{rng.choice(_FLOW_CURR_PHRASES)}{_make_snippet(verse.text)}")
     if nxt:
-        parts.append(f"後文又接著{_make_snippet(nxt.text)}")
+        parts.append(f"{rng.choice(_FLOW_NEXT_PHRASES)}{_make_snippet(nxt.text)}")
     return "；".join(parts) + "。"
 
 
-def _build_section_summary_text(section_title: str, verses: list[Verse]) -> str:
-    """Build a citation-light summary for a titled section."""
-    point1, point2 = _support_points(verses)
-    if point1 == point2:
-        return f"主要圍繞{point1}"
-    return f"先提到{point1}，後面又延伸到{point2}"
+_SECTION_SUMMARY_TEXT_TEMPLATES = (
+    "核心在於{point1}，並進一步說明{point2}",
+    "從{point1}開始，逐步帶出{point2}的主題",
+    "主要描述{point1}，其中特別強調{point2}",
+    "圍繞{point1}展開，透過{point2}來深化主旨",
+    "以{point1}為起點，引導讀者理解{point2}",
+    "先談到{point1}，再延伸到{point2}，兩者互相呼應",
+    "{point1}是這段的基礎，接著{point2}進一步展開",
+    "重點在於{point1}，同時也提到{point2}",
+)
+
+_SECTION_SUMMARY_TEXT_TEMPLATES_3 = (
+    "核心在於{point1}，並進一步說明{point2}，最終帶出{point3}",
+    "從{point1}開始，經過{point2}，最後聚焦在{point3}",
+    "主要描述{point1}，其中{point2}和{point3}是兩個重要面向",
+    "以{point1}為起點，透過{point2}過渡到{point3}",
+    "這段的脈絡是{point1}、{point2}，最終歸結到{point3}",
+    "{point1}是基礎，{point2}是展開，{point3}是總結",
+)
 
 
-def _build_topic_summary_text(topic: str, verses: list[Verse]) -> str:
-    """Build a citation-light summary for a thematic QA sample."""
-    point1, point2 = _support_points(verses)
-    if point1 == point2:
-        return f"常用{point1}這類內容幫助人理解"
-    return f"常會從{point1}與{point2}這些角度來呈現"
+def _build_section_summary_text(
+    section_title: str, verses: list[Verse], rng: random.Random | None = None
+) -> str:
+    """Build a diverse summary text for a titled section."""
+    points = _support_points(verses)
+    if len(points) == 1:
+        return f"主要圍繞{points[0]}"
+    if rng is None:
+        rng = random.Random()
+    if len(points) >= 3:
+        tmpl = rng.choice(_SECTION_SUMMARY_TEXT_TEMPLATES_3)
+        return tmpl.format(point1=points[0], point2=points[1], point3=points[2])
+    tmpl = rng.choice(_SECTION_SUMMARY_TEXT_TEMPLATES)
+    return tmpl.format(point1=points[0], point2=points[1])
+
+
+_TOPIC_SUMMARY_TEXT_TEMPLATES = (
+    "從{point1}和{point2}這些角度來呈現",
+    "透過{point1}以及{point2}來傳達核心信息",
+    "反覆強調{point1}，同時也指向{point2}",
+    "一方面談到{point1}，另一方面也涉及{point2}",
+    "以{point1}為核心，延伸出{point2}的教導",
+    "{point1}是重要面向，{point2}則是另一個層次的呈現",
+    "多處提到{point1}，並且與{point2}相互連結",
+    "不同經卷從{point1}和{point2}兩個方向闡述",
+)
+
+
+def _build_topic_summary_text(
+    topic: str, verses: list[Verse], rng: random.Random | None = None
+) -> str:
+    """Build a diverse summary text for a thematic QA sample."""
+    points = _support_points(verses)
+    if len(points) == 1:
+        return f"常用{points[0]}這類內容幫助人理解"
+    if rng is None:
+        rng = random.Random()
+    tmpl = rng.choice(_TOPIC_SUMMARY_TEXT_TEMPLATES)
+    return tmpl.format(point1=points[0], point2=points[1])
 
 
 def _rebalance_samples(samples: list[Sample], seed: int) -> list[Sample]:
@@ -381,9 +453,15 @@ def generate_type_b(books: list[Book], rng: random.Random) -> list[Sample]:
                     chapter=chapter.number,
                     section=section.title,
                     summary_text=_build_section_summary_text(
-                        section.title, list(section.verses)
+                        section.title, list(section.verses), rng
                     ),
                     reference_span=_make_reference_span(list(section.verses)),
+                    key_verse_ref=_make_reference(
+                        _pick_support_verses(list(section.verses))[0]
+                    ),
+                    key_verse_snippet=_make_snippet(
+                        _pick_support_verses(list(section.verses))[0].text
+                    ),
                 )
                 samples.append(
                     Sample(
@@ -619,7 +697,7 @@ def generate_type_d(
                     references = [v for v in (prev, verse, nxt) if v is not None]
                     answer_template = rng.choice(_CONTEXT_EXPLANATION_TEMPLATES)
                     answer = answer_template.format(
-                        flow_text=_build_context_flow(prev, verse, nxt),
+                        flow_text=_build_context_flow(prev, verse, nxt, rng),
                         references_text=_join_references(references),
                     )
                 else:
@@ -778,6 +856,15 @@ def generate_type_e(
 # --- Type G: General Bible QA ---
 
 
+def _pad_points(points: tuple[str, ...], n: int = 2) -> tuple[str, ...]:
+    """Ensure at least *n* support points, repeating the last if needed."""
+    if not points:
+        return ("這段重點",) * n
+    while len(points) < n:
+        points = points + (points[-1],)
+    return points
+
+
 def generate_type_g(books: list[Book], rng: random.Random) -> list[Sample]:
     """Generate answer-first Bible QA samples with supporting references."""
     samples = []
@@ -788,7 +875,8 @@ def generate_type_g(books: list[Book], rng: random.Random) -> list[Sample]:
                 if not section.title or not section.verses:
                     continue
 
-                point1, point2 = _support_points(list(section.verses))
+                points = _pad_points(_support_points(list(section.verses)))
+                key_verse = _pick_support_verses(list(section.verses))[0]
                 sys_prompt = _general_prompt(rng)
                 question = rng.choice(_GENERAL_SECTION_QA_TEMPLATES).format(
                     book=book.name,
@@ -798,9 +886,11 @@ def generate_type_g(books: list[Book], rng: random.Random) -> list[Sample]:
                 reference_span = _make_reference_span(list(section.verses))
                 answer = rng.choice(_GENERAL_SECTION_ANSWER_TEMPLATES).format(
                     section=section.title,
-                    point1=point1,
-                    point2=point2,
+                    point1=points[0],
+                    point2=points[1],
                     references_text=reference_span,
+                    key_verse_ref=_make_reference(key_verse),
+                    key_verse_snippet=_make_snippet(key_verse.text),
                 )
                 samples.append(
                     Sample(
@@ -815,14 +905,17 @@ def generate_type_g(books: list[Book], rng: random.Random) -> list[Sample]:
             continue
 
         support_verses = rng.sample(verses, min(2, len(verses)))
-        point1, point2 = _support_points(support_verses)
+        points = _pad_points(_support_points(support_verses))
+        key_verse = support_verses[0]
         sys_prompt = _general_prompt(rng)
         question = rng.choice(_GENERAL_TOPIC_QA_TEMPLATES).format(topic=topic)
         answer = rng.choice(_GENERAL_TOPIC_ANSWER_TEMPLATES).format(
             topic=topic,
-            point1=point1,
-            point2=point2,
+            point1=points[0],
+            point2=points[1],
             references_text=_join_references(support_verses),
+            key_verse_ref=_make_reference(key_verse),
+            key_verse_snippet=_make_snippet(key_verse.text),
         )
         samples.append(
             Sample(
@@ -856,7 +949,7 @@ def generate_type_h(books: list[Book], rng: random.Random) -> list[Sample]:
                 reference_span = _make_reference_span(list(section.verses))
                 answer = rng.choice(_NO_QUOTE_ANSWER_TEMPLATES).format(
                     summary_text=_build_section_summary_text(
-                        section.title, list(section.verses)
+                        section.title, list(section.verses), rng
                     ),
                     references_text=reference_span,
                 )
@@ -876,7 +969,7 @@ def generate_type_h(books: list[Book], rng: random.Random) -> list[Sample]:
         sys_prompt = _general_prompt(rng)
         question = rng.choice(_NO_QUOTE_TOPIC_QA_TEMPLATES).format(topic=topic)
         answer = rng.choice(_NO_QUOTE_ANSWER_TEMPLATES).format(
-            summary_text=_build_topic_summary_text(topic, support_verses),
+            summary_text=_build_topic_summary_text(topic, support_verses, rng),
             references_text=_join_references(support_verses),
         )
         samples.append(
