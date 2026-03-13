@@ -1,6 +1,6 @@
 # Fine-Tuning Bible
 
-使用 [Gemma-3-12B-IT](https://huggingface.co/google/gemma-3-12b-it) 模型進行 QLoRA SFT fine-tuning，建立繁體中文聖經知識問答助手。
+使用 [Gemma-3-12B-IT](https://huggingface.co/google/gemma-3-12b-it) 模型進行 LoRA SFT fine-tuning，建立繁體中文聖經知識問答助手。
 目前 pipeline 已調整為「先回答、再視需要輔助引用經文」，避免模型把每個問題都當成查經文任務。
 
 ## 功能特色
@@ -8,7 +8,7 @@
 - 從 66 卷繁體中文和合本聖經 markdown 原始檔案自動解析、生成訓練資料
 - 8 種樣本類型，涵蓋經文查詢、段落摘要、主題搜尋、上下文理解、經文辨識、拒絕回應、一般 QA、citation-light QA
 - 新增 answer-first 資料與回答模式路由，讓模型先回答使用者問題，再把經文當作輔助
-- QLoRA 4-bit 量化訓練，降低 GPU 記憶體需求
+- LoRA 訓練，保留較高的權重精度以降低引用漂移
 - 內建多維度評估（ROUGE-L、經文辨識準確率、抗幻覺率、過度引用率、直接回答率）
 - 使用 [Trackio](https://github.com/gradio-app/trackio) 進行訓練實驗追蹤，支援本機儀表板或同步至 Hugging Face Space
 
@@ -28,7 +28,7 @@ fine_tuning_bible/
 │   │   ├── dataset_generator.py # 8 類樣本生成器（A-H）+ 重平衡
 │   │   └── build_dataset.py     # 資料集建構與驗證
 │   ├── training/
-│   │   ├── train.py             # QLoRA SFT 訓練
+│   │   ├── train.py             # LoRA SFT 訓練
 │   │   └── merge_model.py       # 合併 LoRA adapter 至 base model
 │   └── evaluation/
 │       ├── evaluate.py          # 多維度自動評估
@@ -56,7 +56,7 @@ fine_tuning_bible/
 ## 環境需求
 
 - Python >= 3.11
-- CUDA 相容 GPU（建議 VRAM >= 16GB）
+- CUDA 相容 GPU（Gemma-3-12B LoRA 建議 VRAM >= 48GB）
 - [uv](https://docs.astral.sh/uv/) 套件管理工具
 
 ## 快速開始
@@ -93,7 +93,7 @@ uv run python -m src.data.build_dataset
 uv run python -m src.training.train
 ```
 
-使用 QLoRA 進行 SFT 訓練，adapter 儲存至 `outputs/bible-assistant/final_adapter/`。
+使用 LoRA 進行 SFT 訓練，adapter 儲存至 `outputs/bible-assistant/final_adapter/`。
 
 ### 5. 合併模型（可選）
 
@@ -112,8 +112,8 @@ uv run python -m src.evaluation.inference
 啟動互動式 REPL，可即時向聖經助手提問。支援參數調整：
 
 ```
-/set temperature=0.5
-/set top_p=0.85
+/set temperature=0.0
+/set top_p=1.0
 /set max_new_tokens=1024
 ```
 
@@ -146,17 +146,17 @@ uv run python -m src.evaluation.evaluate
 | 參數 | 值 |
 |------|-----|
 | 基礎模型 | `google/gemma-3-12b-it` |
-| 量化 | 4-bit NF4, double quant, bfloat16 |
+| 訓練法 | LoRA |
 | LoRA rank | 32 |
-| LoRA alpha | 64 |
+| LoRA alpha | 32 |
 | Target modules | all-linear |
 | Batch size | 2 |
 | Gradient accumulation | 8 (effective batch = 16) |
-| Learning rate | 5e-5 (cosine schedule, 10% warmup) |
-| Epochs | 2 |
-| Max sequence length | 1536 |
+| Learning rate | 2e-5 (cosine schedule, 10% warmup) |
+| Epochs | 1.5 |
+| Max sequence length | 1024 |
 | Packing | disabled |
-| Optimizer | paged AdamW 8-bit |
+| Optimizer | AdamW (PyTorch) |
 | Gradient checkpointing | enabled |
 
 完整設定參見 [`configs/training_config.yaml`](configs/training_config.yaml)。

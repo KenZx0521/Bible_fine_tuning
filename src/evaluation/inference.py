@@ -62,9 +62,9 @@ def generate(
     question: str,
     *,
     mode: str = "auto",
-    temperature: float = 0.7,
-    top_p: float = 0.9,
-    max_new_tokens: int = 512,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
+    max_new_tokens: int = 256,
 ) -> str:
     """Generate a response to a question."""
     response_mode = select_response_mode(question) if mode == "auto" else mode
@@ -76,15 +76,21 @@ def generate(
         messages, tokenize=False, add_generation_prompt=True
     )
     inputs = tokenizer(input_text, return_tensors="pt").to(model.device)
+    generate_kwargs = {
+        **inputs,
+        "max_new_tokens": max_new_tokens,
+        "pad_token_id": tokenizer.pad_token_id,
+        "eos_token_id": tokenizer.eos_token_id,
+    }
+    if temperature > 0:
+        generate_kwargs["do_sample"] = True
+        generate_kwargs["temperature"] = temperature
+        generate_kwargs["top_p"] = top_p
+    else:
+        generate_kwargs["do_sample"] = False
 
     with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=temperature > 0,
-            temperature=temperature if temperature > 0 else 1.0,
-            top_p=top_p,
-        )
+        outputs = model.generate(**generate_kwargs)
 
     response = tokenizer.decode(
         outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
@@ -100,14 +106,14 @@ def repl(model_path: str | None = None) -> None:
     print("聖經知識助手 — 互動模式")
     print("=" * 60)
     print("輸入問題開始對話，輸入 'quit' 退出")
-    print("可調參數: temperature=0.7, top_p=0.9, max_new_tokens=512, mode=auto")
+    print("可調參數: temperature=0.0, top_p=1.0, max_new_tokens=256, mode=auto")
     print("-" * 60)
 
     model, tokenizer = _load_model(model_path)
 
-    temperature = 0.7
-    top_p = 0.9
-    max_new_tokens = 512
+    temperature = 0.0
+    top_p = 1.0
+    max_new_tokens = 256
     mode = "auto"
 
     while True:

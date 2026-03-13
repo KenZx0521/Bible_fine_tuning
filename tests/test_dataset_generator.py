@@ -95,20 +95,21 @@ class TestTypeB:
             question = sample.messages[1]["content"]
             assert "「」" not in question
 
-    def test_summary_contains_verses(self, sample_books):
+    def test_summary_is_concise_not_full_verse_dump(self, sample_books):
         rng = random.Random(42)
         samples = generate_type_b(sample_books, rng)
         answer = samples[0].messages[2]["content"]
-        assert "起初" in answer or "上帝" in answer
+        assert "查考" in answer or "對照" in answer or "參考" in answer
+        assert "第1節：" not in answer
 
     def test_uses_answer_templates(self, sample_books):
         """Verify Type B uses varied answer templates."""
         rng = random.Random(42)
         samples = generate_type_b(sample_books, rng)
         answers = [s.messages[2]["content"] for s in samples]
-        # All answers should contain section-related content
+        # All answers should remain summary-oriented
         for a in answers:
-            assert "內容" in a or "記載" in a or "經文" in a
+            assert "這段" in a or "核心" in a or "重點" in a or "白話整理" in a
 
 
 class TestTypeC:

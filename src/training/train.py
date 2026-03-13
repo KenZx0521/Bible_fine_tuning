@@ -1,4 +1,4 @@
-"""QLoRA SFT training with Trackio experiment tracking.
+"""LoRA SFT training with Trackio experiment tracking.
 
 Run: uv run python -m src.training.train
 """
@@ -11,30 +11,19 @@ from pathlib import Path
 import torch
 import trackio
 import yaml
-from datasets import DatasetDict, load_from_disk
+from datasets import load_from_disk
 from dotenv import load_dotenv
 from peft import LoraConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
-from src.constants import CONFIG_PATH, MODEL_ID, OUTPUT_DIR
+from src.constants import CONFIG_PATH, OUTPUT_DIR
 
 
 def _load_config() -> dict:
     """Load training configuration from YAML."""
     with open(CONFIG_PATH, encoding="utf-8") as f:
         return yaml.safe_load(f)
-
-
-def _build_bnb_config(quant_cfg: dict) -> BitsAndBytesConfig:
-    """Build BitsAndBytes quantization config."""
-    compute_dtype = getattr(torch, quant_cfg["bnb_4bit_compute_dtype"])
-    return BitsAndBytesConfig(
-        load_in_4bit=quant_cfg["load_in_4bit"],
-        bnb_4bit_quant_type=quant_cfg["bnb_4bit_quant_type"],
-        bnb_4bit_use_double_quant=quant_cfg["bnb_4bit_use_double_quant"],
-        bnb_4bit_compute_dtype=compute_dtype,
-    )
 
 
 def _build_lora_config(lora_cfg: dict) -> LoraConfig:
@@ -63,7 +52,7 @@ def train() -> None:
     trackio_cfg = config["trackio"]
 
     print("=" * 60)
-    print("Bible QLoRA SFT Training")
+    print("Bible LoRA SFT Training")
     print("=" * 60)
     print(f"  Model: {model_id}")
 
@@ -82,6 +71,7 @@ def train() -> None:
             "batch_size": train_cfg["per_device_train_batch_size"],
             "grad_accum": train_cfg["gradient_accumulation_steps"],
             "max_length": train_cfg["max_length"],
+            "training_method": "lora",
             "neftune_noise_alpha": train_cfg.get("neftune_noise_alpha"),
         },
     }
@@ -107,12 +97,8 @@ def train() -> None:
     print(f"  Train: {len(ds_dict['train'])} 筆")
     print(f"  Test:  {len(ds_dict['test'])} 筆")
 
-    # Build quantization config
-    print("\n[2/5] 設定量化參數...")
-    bnb_config = _build_bnb_config(config["quantization"])
-
     # Load tokenizer and model
-    print("\n[3/5] 載入模型和 tokenizer...")
+    print("\n[2/4] 載入模型和 tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -121,15 +107,16 @@ def train() -> None:
     if "token_type_ids" in tokenizer.model_input_names:
         tokenizer.model_input_names.remove("token_type_ids")
 
+    model_dtype = torch.bfloat16 if train_cfg.get("bf16") else torch.float32
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
-        quantization_config=bnb_config,
-        device_map="auto",
-        torch_dtype=torch.bfloat16,
+        torch_dtype=model_dtype,
+        low_cpu_mem_usage=True,
     )
+    model.config.use_cache = False
 
     # Build LoRA config
-    print("\n[4/5] 設定 LoRA...")
+    print("\n[3/4] 設定 LoRA...")
     lora_config = _build_lora_config(config["lora"])
 
     # Build SFT config
@@ -168,7 +155,7 @@ def train() -> None:
     sft_config = SFTConfig(**sft_kwargs)
 
     # Initialize trainer
-    print("\n[5/5] 開始訓練...")
+    print("\n[4/4] 開始訓練...")
     trainer = SFTTrainer(
         model=model,
         args=sft_config,

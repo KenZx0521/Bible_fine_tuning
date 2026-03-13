@@ -41,7 +41,6 @@ from src.data.templates import (
     _IDENTIFICATION_ANSWER_TEMPLATES,
     _IDENTIFICATION_ANSWER_WITH_SECTION_TEMPLATES,
     _IDENTIFICATION_TEMPLATES,
-    _MAX_SECTION_ANSWER_CHARS,
     _MISSPELLED_BOOKS,
     _NO_QUOTE_ANSWER_TEMPLATES,
     _NO_QUOTE_SECTION_QA_TEMPLATES,
@@ -53,7 +52,7 @@ from src.data.templates import (
     _REFUSAL_NONEXISTENT_BOOK,
     _REFUSAL_OUT_OF_RANGE,
     _REFUSAL_OUT_OF_RANGE_VERSE,
-    _SECTION_ANSWER_TEMPLATES,
+    _SECTION_SUMMARY_ANSWER_TEMPLATES,
     _SECTION_SUMMARY_TEMPLATES,
     _TESTAMENT_CATEGORIES,
     _THEMATIC_ANSWER_TEMPLATES,
@@ -151,6 +150,22 @@ def _make_snippet(text: str) -> str:
     return snippet
 
 
+def _make_support_point(text: str, max_chars: int = 18) -> str:
+    """Compress verse text into a short support point for answer-first QA."""
+    point = _prepare_verse_text(text)
+    for token in ("「", "」", "『", "』", "\n"):
+        point = point.replace(token, "")
+    point = point.strip("。；，：、 ")
+    for sep in ("。", "；", "，", "："):
+        pos = point.find(sep, 8)
+        if pos != -1:
+            point = point[:pos]
+            break
+    if len(point) > max_chars:
+        point = point[:max_chars].rstrip("；，：、 ")
+    return point or "這段重點"
+
+
 def _pick_support_verses(verses: list[Verse]) -> list[Verse]:
     """Pick one or two representative verses for concise support."""
     if not verses:
@@ -166,10 +181,33 @@ def _support_points(verses: list[Verse]) -> tuple[str, str]:
     if not supports:
         return ("這段內容需要回到上下文理解", "可再對照相關經文")
 
-    points = [_make_snippet(v.text) for v in supports]
+    points = [_make_support_point(v.text) for v in supports]
     if len(points) == 1:
         return points[0], points[0]
     return points[0], points[1]
+
+
+def _make_reference_span(verses: list[Verse]) -> str:
+    """Format a contiguous verse span for a section-level reference."""
+    if not verses:
+        return "相關段落"
+
+    first = verses[0]
+    last = verses[-1]
+    if (
+        first.book == last.book
+        and first.chapter == last.chapter
+        and first.verse_number == last.verse_number
+    ):
+        return _make_reference(first)
+
+    if first.book == last.book and first.chapter == last.chapter:
+        return (
+            f"{first.book}第{first.chapter}章"
+            f"第{first.verse_number}節至第{last.verse_number}節"
+        )
+
+    return f"{_make_reference(first)}至{_make_reference(last)}"
 
 
 def _build_context_flow(prev: Verse | None, verse: Verse, nxt: Verse | None) -> str:
@@ -187,16 +225,16 @@ def _build_section_summary_text(section_title: str, verses: list[Verse]) -> str:
     """Build a citation-light summary for a titled section."""
     point1, point2 = _support_points(verses)
     if point1 == point2:
-        return f"「{section_title}」這段主要圍繞{point1}"
-    return f"「{section_title}」這段先提到{point1}，後面又延伸到{point2}"
+        return f"主要圍繞{point1}"
+    return f"先提到{point1}，後面又延伸到{point2}"
 
 
 def _build_topic_summary_text(topic: str, verses: list[Verse]) -> str:
     """Build a citation-light summary for a thematic QA sample."""
     point1, point2 = _support_points(verses)
     if point1 == point2:
-        return f"聖經談「{topic}」時，常用{point1}這類內容幫助人理解"
-    return f"聖經談「{topic}」時，常會從{point1}與{point2}這些角度來呈現"
+        return f"常用{point1}這類內容幫助人理解"
+    return f"常會從{point1}與{point2}這些角度來呈現"
 
 
 def _rebalance_samples(samples: list[Sample], seed: int) -> list[Sample]:
@@ -319,7 +357,7 @@ def generate_type_b(books: list[Book], rng: random.Random) -> list[Sample]:
 
     Filters:
     - Skip sections with empty title
-    - Truncate very long sections (>1500 chars) to first 8 verses + summary
+    - Answer with concise summary + reference span instead of verse dump
     """
     samples = []
     for book in books:
@@ -337,31 +375,15 @@ def generate_type_b(books: list[Book], rng: random.Random) -> list[Sample]:
                     chapter=chapter.number,
                     section=section.title,
                 )
-
-                # Calculate total verse text length
-                full_text = "\n".join(
-                    f"第{v.verse_number}節：{_fix_quote_pairing(v.text)}" for v in section.verses
-                )
-
-                if len(full_text) <= _MAX_SECTION_ANSWER_CHARS:
-                    verses_text = full_text
-                else:
-                    # Truncate: show first 8 verses + count summary
-                    shown = section.verses[:8]
-                    verses_text = "\n".join(
-                        f"第{v.verse_number}節：{_fix_quote_pairing(v.text)}" for v in shown
-                    )
-                    verses_text += (
-                        f"\n\n（本段共{len(section.verses)}節經文，"
-                        f"以上列出前{len(shown)}節）"
-                    )
-
-                answer_template = rng.choice(_SECTION_ANSWER_TEMPLATES)
+                answer_template = rng.choice(_SECTION_SUMMARY_ANSWER_TEMPLATES)
                 answer = answer_template.format(
                     book=book.name,
                     chapter=chapter.number,
                     section=section.title,
-                    verses_text=verses_text,
+                    summary_text=_build_section_summary_text(
+                        section.title, list(section.verses)
+                    ),
+                    reference_span=_make_reference_span(list(section.verses)),
                 )
                 samples.append(
                     Sample(
@@ -766,7 +788,6 @@ def generate_type_g(books: list[Book], rng: random.Random) -> list[Sample]:
                 if not section.title or not section.verses:
                     continue
 
-                support_verses = _pick_support_verses(list(section.verses))
                 point1, point2 = _support_points(list(section.verses))
                 sys_prompt = _general_prompt(rng)
                 question = rng.choice(_GENERAL_SECTION_QA_TEMPLATES).format(
@@ -774,11 +795,12 @@ def generate_type_g(books: list[Book], rng: random.Random) -> list[Sample]:
                     chapter=chapter.number,
                     section=section.title,
                 )
+                reference_span = _make_reference_span(list(section.verses))
                 answer = rng.choice(_GENERAL_SECTION_ANSWER_TEMPLATES).format(
                     section=section.title,
                     point1=point1,
                     point2=point2,
-                    references_text=_join_references(support_verses),
+                    references_text=reference_span,
                 )
                 samples.append(
                     Sample(
@@ -825,18 +847,18 @@ def generate_type_h(books: list[Book], rng: random.Random) -> list[Sample]:
                 if not section.title or not section.verses:
                     continue
 
-                support_verses = _pick_support_verses(list(section.verses))
                 sys_prompt = _general_prompt(rng)
                 question = rng.choice(_NO_QUOTE_SECTION_QA_TEMPLATES).format(
                     book=book.name,
                     chapter=chapter.number,
                     section=section.title,
                 )
+                reference_span = _make_reference_span(list(section.verses))
                 answer = rng.choice(_NO_QUOTE_ANSWER_TEMPLATES).format(
                     summary_text=_build_section_summary_text(
                         section.title, list(section.verses)
                     ),
-                    references_text=_join_references(support_verses),
+                    references_text=reference_span,
                 )
                 samples.append(
                     Sample(

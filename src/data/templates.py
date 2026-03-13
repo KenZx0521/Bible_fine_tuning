@@ -83,23 +83,21 @@ _SECTION_SUMMARY_TEMPLATES = (
     "{book}第{chapter}章「{section}」的重點是什麼？",
     "可以幫我整理{book}第{chapter}章「{section}」的內容嗎？",
     "「{section}」是{book}第{chapter}章的哪一段？這段在說什麼？",
-    "{book}第{chapter}章中「{section}」這個段落包含哪些經文？",
+    "{book}第{chapter}章中「{section}」這個段落可以怎麼概括？",
     "請幫我歸納{book}第{chapter}章「{section}」段落的重點。",
 )
 
-_SECTION_ANSWER_TEMPLATES = (
-    "{book}第{chapter}章「{section}」這段的內容如下：\n\n{verses_text}",
-    "在{book}第{chapter}章中，「{section}」這段經文記載了以下內容：\n\n{verses_text}",
-    "以下是{book}第{chapter}章「{section}」段落的經文：\n\n{verses_text}",
-    "關於{book}第{chapter}章的「{section}」，其內容如下：\n\n{verses_text}",
-    # v5 新增 6 個
-    "好的，{book}第{chapter}章「{section}」段落的經文內容為：\n\n{verses_text}",
-    "讓我為您查閱{book}第{chapter}章「{section}」的內容：\n\n{verses_text}",
-    "{book}第{chapter}章中「{section}」這段記載如下：\n\n{verses_text}",
-    "「{section}」出現在{book}第{chapter}章，經文內容為：\n\n{verses_text}",
-    "您詢問的{book}第{chapter}章「{section}」段落包含以下經文：\n\n{verses_text}",
-    "{book}第{chapter}章「{section}」的段落經文如下所示：\n\n{verses_text}",
+_SECTION_SUMMARY_ANSWER_TEMPLATES = (
+    "簡單說，{book}第{chapter}章「{section}」這段主要在談{summary_text}。若要回頭對照原文，可參考{reference_span}。",
+    "{book}第{chapter}章「{section}」這段的核心可以先抓成：{summary_text}。相關經文大致落在{reference_span}。",
+    "如果先用重點整理，{book}第{chapter}章「{section}」這段是在說{summary_text}；需要查原文時，再對照{reference_span}即可。",
+    "{book}第{chapter}章「{section}」這段內容不是要逐節背誦，而是要先理解重點：{summary_text}。原文可參考{reference_span}。",
+    "白話整理的話，{book}第{chapter}章「{section}」這段圍繞的是{summary_text}。經文範圍可對照{reference_span}。",
+    "先抓核心意思的話，{book}第{chapter}章「{section}」這段是在談{summary_text}。若需要逐字查考，再回到{reference_span}。",
 )
+
+# Backward-compatible alias for older tests/imports.
+_SECTION_ANSWER_TEMPLATES = _SECTION_SUMMARY_ANSWER_TEMPLATES
 
 _GENERAL_SECTION_QA_TEMPLATES = (
     "{book}第{chapter}章「{section}」這段主要想傳達什麼？",

@@ -25,7 +25,7 @@ from src.data.templates import (
     _REFUSAL_NONEXISTENT_BOOK,
     _REFUSAL_OUT_OF_RANGE,
     _REFUSAL_OUT_OF_RANGE_VERSE,
-    _SECTION_ANSWER_TEMPLATES,
+    _SECTION_SUMMARY_ANSWER_TEMPLATES,
     _SECTION_SUMMARY_TEMPLATES,
     _TESTAMENT_CATEGORIES,
     _THEMATIC_ANSWER_TEMPLATES,
@@ -53,7 +53,7 @@ class TestTemplateTypes:
         assert isinstance(_SECTION_SUMMARY_TEMPLATES, tuple)
 
     def test_section_answer_is_tuple(self):
-        assert isinstance(_SECTION_ANSWER_TEMPLATES, tuple)
+        assert isinstance(_SECTION_SUMMARY_ANSWER_TEMPLATES, tuple)
 
     def test_context_is_tuple(self):
         assert isinstance(_CONTEXT_TEMPLATES, tuple)
@@ -120,7 +120,7 @@ class TestTemplateCounts:
         assert len(_SECTION_SUMMARY_TEMPLATES) >= 10
 
     def test_section_answer_min_10(self):
-        assert len(_SECTION_ANSWER_TEMPLATES) >= 10
+        assert len(_SECTION_SUMMARY_ANSWER_TEMPLATES) >= 6
 
     def test_context_min_25(self):
         assert len(_CONTEXT_TEMPLATES) >= 25
@@ -186,11 +186,12 @@ class TestTemplatePlaceholders:
             assert "{section}" in tmpl, f"Missing {{section}} in: {tmpl}"
 
     def test_section_answer_placeholders(self):
-        for tmpl in _SECTION_ANSWER_TEMPLATES:
+        for tmpl in _SECTION_SUMMARY_ANSWER_TEMPLATES:
             assert "{book}" in tmpl, f"Missing {{book}} in: {tmpl}"
             assert "{chapter}" in tmpl, f"Missing {{chapter}} in: {tmpl}"
             assert "{section}" in tmpl, f"Missing {{section}} in: {tmpl}"
-            assert "{verses_text}" in tmpl, f"Missing {{verses_text}} in: {tmpl}"
+            assert "{summary_text}" in tmpl, f"Missing {{summary_text}} in: {tmpl}"
+            assert "{reference_span}" in tmpl, f"Missing {{reference_span}} in: {tmpl}"
 
     def test_context_placeholders(self):
         for tmpl in _CONTEXT_TEMPLATES:
