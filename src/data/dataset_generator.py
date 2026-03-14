@@ -666,7 +666,7 @@ def generate_type_d(
 
             for idx in selected_indices:
                 verse = all_verses[idx]
-                sys_prompt = _general_prompt(rng)
+                sys_prompt = _lookup_prompt(rng)
                 template = rng.choice(_CONTEXT_TEMPLATES)
                 question = template.format(
                     book=verse.book,

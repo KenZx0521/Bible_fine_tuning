@@ -192,6 +192,17 @@ class TestTypeD:
             assert "本節" in answer
 
 
+    def test_uses_lookup_prompt(self, sample_books):
+        """Type D should use LOOKUP prompt (not GENERAL_QA)."""
+        rng = random.Random(42)
+        samples = generate_type_d(sample_books, rng)
+        for sample in samples:
+            sys_prompt = sample.messages[0]["content"]
+            assert sys_prompt in LOOKUP_SYSTEM_PROMPT_VARIANTS, (
+                f"Type D should use LOOKUP prompt, got: {sys_prompt[:60]}"
+            )
+
+
 class TestTypeDDiversity:
     """Tests for answer diversity in Type D."""
 

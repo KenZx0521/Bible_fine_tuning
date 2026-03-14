@@ -24,6 +24,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from src.constants import DATA_DIR, MODEL_ID, OUTPUT_DIR
 from src.data.parser import parse_all_books
 from src.response_policy import get_system_prompt, select_response_mode
+from src.utils import get_stopping_token_ids
 
 
 def _load_model_and_tokenizer(model_path: str | None = None):
@@ -76,6 +77,8 @@ def _generate_response(
             max_new_tokens=max_new_tokens,
             do_sample=False,
             temperature=1.0,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=get_stopping_token_ids(tokenizer),
         )
 
     response = tokenizer.decode(

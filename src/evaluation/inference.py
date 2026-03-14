@@ -13,6 +13,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from src.constants import MODEL_ID, OUTPUT_DIR
 from src.response_policy import GENERAL_QA_MODE, LOOKUP_MODE, get_system_prompt, select_response_mode
+from src.utils import get_stopping_token_ids
 
 
 def _load_model(model_path: str | None = None):
@@ -81,7 +82,7 @@ def generate(
         **inputs,
         "max_new_tokens": max_new_tokens,
         "pad_token_id": tokenizer.pad_token_id,
-        "eos_token_id": tokenizer.eos_token_id,
+        "eos_token_id": get_stopping_token_ids(tokenizer),
         "repetition_penalty": repetition_penalty,
     }
     if temperature > 0:
