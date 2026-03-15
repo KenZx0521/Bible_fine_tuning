@@ -24,7 +24,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from src.constants import DATA_DIR, MODEL_ID, OUTPUT_DIR
 from src.data.parser import parse_all_books
 from src.response_policy import get_system_prompt, select_response_mode
-from src.utils import get_stopping_token_ids
+from src.utils import get_stopping_token_ids, strip_thinking
 
 
 def _load_model_and_tokenizer(model_path: str | None = None):
@@ -84,7 +84,9 @@ def _generate_response(
     response = tokenizer.decode(
         outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
     )
-    return response.strip()
+    # Strip CoT thinking tags — evaluate only the answer
+    _, response = strip_thinking(response)
+    return response
 
 
 def evaluate_verse_recall(

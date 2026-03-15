@@ -197,7 +197,7 @@ class TestTokenLengthFilter:
 
     def test_long_sample_excluded_from_dataset(self):
         """Overly long samples should be excluded from the final dataset."""
-        long_answer = "超長" * 1100
+        long_answer = "超長" * 1500
         normal_samples = [
             _make_sample(question=f"正常問題{i}", answer=f"正常回答{i}")
             for i in range(10)

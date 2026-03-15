@@ -30,6 +30,25 @@ from src.data.templates import (
     _CONTEXT_ANSWER_TEMPLATES,
     _CONTEXT_EXPLANATION_TEMPLATES,
     _CONTEXT_TEMPLATES,
+    _COT_TYPE_A,
+    _COT_TYPE_A_SECTION,
+    _COT_TYPE_B,
+    _COT_TYPE_C_CATEGORY,
+    _COT_TYPE_C_OVERALL,
+    _COT_TYPE_C_TESTAMENT,
+    _COT_TYPE_D,
+    _COT_TYPE_E,
+    _COT_TYPE_F1,
+    _COT_TYPE_F2,
+    _COT_TYPE_F2B,
+    _COT_TYPE_F3_CATEGORY,
+    _COT_TYPE_F3_GENERIC,
+    _COT_TYPE_F4,
+    _COT_TYPE_F5,
+    _COT_TYPE_G_SECTION,
+    _COT_TYPE_G_TOPIC,
+    _COT_TYPE_H_SECTION,
+    _COT_TYPE_H_TOPIC,
     _FAKE_BOOKS,
     _FAKE_QUERY_TEMPLATES,
     _GENERAL_SECTION_ANSWER_TEMPLATES,
@@ -82,12 +101,20 @@ class Sample:
     messages: tuple[dict[str, str], ...]
 
 
+def _wrap_cot(thinking_text: str) -> str:
+    """Wrap thinking text in <think> tags."""
+    return f"<think>\n{thinking_text}\n</think>"
+
+
 def _make_messages(
     question: str,
     answer: str,
+    thinking: str = "",
     system_prompt: str = GENERAL_QA_SYSTEM_PROMPT,
 ) -> tuple[dict[str, str], ...]:
     """Create a messages tuple in TRL SFT format."""
+    if thinking:
+        answer = f"{thinking}\n\n{answer}"
     return (
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": question},
@@ -404,6 +431,11 @@ def generate_type_a(books: list[Book], rng: random.Random) -> list[Sample]:
                     text=_prepare_verse_text(verse.text),
                     section_title=verse.section_title,
                 )
+                cot_tmpl = rng.choice(_COT_TYPE_A_SECTION)
+                thinking = _wrap_cot(cot_tmpl.format(
+                    book=verse.book, chapter=verse.chapter,
+                    verse=verse.verse_number, section=verse.section_title,
+                ))
             else:
                 answer_template = rng.choice(_VERSE_ANSWER_TEMPLATES)
                 answer = answer_template.format(
@@ -412,10 +444,15 @@ def generate_type_a(books: list[Book], rng: random.Random) -> list[Sample]:
                     verse=verse.verse_number,
                     text=_prepare_verse_text(verse.text),
                 )
+                cot_tmpl = rng.choice(_COT_TYPE_A)
+                thinking = _wrap_cot(cot_tmpl.format(
+                    book=verse.book, chapter=verse.chapter,
+                    verse=verse.verse_number,
+                ))
             samples.append(
                 Sample(
                     sample_type="A",
-                    messages=_make_messages(question, answer, sys_prompt),
+                    messages=_make_messages(question, answer, thinking, sys_prompt),
                 )
             )
     return samples
@@ -463,10 +500,15 @@ def generate_type_b(books: list[Book], rng: random.Random) -> list[Sample]:
                         _pick_support_verses(list(section.verses))[0].text
                     ),
                 )
+                cot_tmpl = rng.choice(_COT_TYPE_B)
+                thinking = _wrap_cot(cot_tmpl.format(
+                    book=book.name, chapter=chapter.number,
+                    section=section.title,
+                ))
                 samples.append(
                     Sample(
                         sample_type="B",
-                        messages=_make_messages(question, answer, sys_prompt),
+                        messages=_make_messages(question, answer, thinking, sys_prompt),
                     )
                 )
     return samples
@@ -563,10 +605,12 @@ def generate_type_c(
             answer = answer_template.format(
                 category=cat, topic=topic, verse_lines=verse_lines_text,
             )
+            cot_tmpl = rng.choice(_COT_TYPE_C_CATEGORY)
+            thinking = _wrap_cot(cot_tmpl.format(topic=topic, category=cat))
             samples.append(
                 Sample(
                     sample_type="C",
-                    messages=_make_messages(question, answer, sys_prompt),
+                    messages=_make_messages(question, answer, thinking, sys_prompt),
                 )
             )
 
@@ -599,10 +643,12 @@ def generate_type_c(
             answer = answer_template.format(
                 topic=topic, verse_lines=verse_lines_text,
             )
+            cot_tmpl = rng.choice(_COT_TYPE_C_OVERALL)
+            thinking = _wrap_cot(cot_tmpl.format(topic=topic))
             samples.append(
                 Sample(
                     sample_type="C",
-                    messages=_make_messages(question, answer, sys_prompt),
+                    messages=_make_messages(question, answer, thinking, sys_prompt),
                 )
             )
 
@@ -637,10 +683,12 @@ def generate_type_c(
                 testament=testament, topic=topic,
                 verse_lines=verse_lines_text,
             )
+            cot_tmpl = rng.choice(_COT_TYPE_C_TESTAMENT)
+            thinking = _wrap_cot(cot_tmpl.format(topic=topic, testament=testament))
             samples.append(
                 Sample(
                     sample_type="C",
-                    messages=_make_messages(question, answer, sys_prompt),
+                    messages=_make_messages(question, answer, thinking, sys_prompt),
                 )
             )
 
@@ -715,10 +763,15 @@ def generate_type_d(
                         context_text=context_text,
                         section_info=section_info,
                     )
+                cot_tmpl = rng.choice(_COT_TYPE_D)
+                thinking = _wrap_cot(cot_tmpl.format(
+                    book=verse.book, chapter=verse.chapter,
+                    verse=verse.verse_number,
+                ))
                 samples.append(
                     Sample(
                         sample_type="D",
-                        messages=_make_messages(question, answer, sys_prompt),
+                        messages=_make_messages(question, answer, thinking, sys_prompt),
                     )
                 )
     return samples
@@ -844,10 +897,12 @@ def generate_type_e(
                 chapter=verse.chapter,
                 verse=verse.verse_number,
             )
+        cot_tmpl = rng.choice(_COT_TYPE_E)
+        thinking = _wrap_cot(cot_tmpl.format(snippet=text_snippet[:20]))
         samples.append(
             Sample(
                 sample_type="E",
-                messages=_make_messages(question, answer, sys_prompt),
+                messages=_make_messages(question, answer, thinking, sys_prompt),
             )
         )
     return samples
@@ -892,10 +947,12 @@ def generate_type_g(books: list[Book], rng: random.Random) -> list[Sample]:
                     key_verse_ref=_make_reference(key_verse),
                     key_verse_snippet=_make_snippet(key_verse.text),
                 )
+                cot_tmpl = rng.choice(_COT_TYPE_G_SECTION)
+                thinking = _wrap_cot(cot_tmpl.format(section=section.title))
                 samples.append(
                     Sample(
                         sample_type="G",
-                        messages=_make_messages(question, answer, sys_prompt),
+                        messages=_make_messages(question, answer, thinking, sys_prompt),
                     )
                 )
 
@@ -917,10 +974,12 @@ def generate_type_g(books: list[Book], rng: random.Random) -> list[Sample]:
             key_verse_ref=_make_reference(key_verse),
             key_verse_snippet=_make_snippet(key_verse.text),
         )
+        cot_tmpl = rng.choice(_COT_TYPE_G_TOPIC)
+        thinking = _wrap_cot(cot_tmpl.format(topic=topic))
         samples.append(
             Sample(
                 sample_type="G",
-                messages=_make_messages(question, answer, sys_prompt),
+                messages=_make_messages(question, answer, thinking, sys_prompt),
             )
         )
 
@@ -953,10 +1012,12 @@ def generate_type_h(books: list[Book], rng: random.Random) -> list[Sample]:
                     ),
                     references_text=reference_span,
                 )
+                cot_tmpl = rng.choice(_COT_TYPE_H_SECTION)
+                thinking = _wrap_cot(cot_tmpl.format(section=section.title))
                 samples.append(
                     Sample(
                         sample_type="H",
-                        messages=_make_messages(question, answer, sys_prompt),
+                        messages=_make_messages(question, answer, thinking, sys_prompt),
                     )
                 )
 
@@ -972,10 +1033,12 @@ def generate_type_h(books: list[Book], rng: random.Random) -> list[Sample]:
             summary_text=_build_topic_summary_text(topic, support_verses, rng),
             references_text=_join_references(support_verses),
         )
+        cot_tmpl = rng.choice(_COT_TYPE_H_TOPIC)
+        thinking = _wrap_cot(cot_tmpl.format(topic=topic))
         samples.append(
             Sample(
                 sample_type="H",
-                messages=_make_messages(question, answer, sys_prompt),
+                messages=_make_messages(question, answer, thinking, sys_prompt),
             )
         )
 
@@ -1007,10 +1070,12 @@ def generate_type_f(
             answer = rng.choice(_REFUSAL_NONEXISTENT_BOOK).format(
                 book=fake_book
             )
+            cot_tmpl = rng.choice(_COT_TYPE_F1)
+            thinking = _wrap_cot(cot_tmpl.format(book=fake_book))
             samples.append(
                 Sample(
                     sample_type="F",
-                    messages=_make_messages(question, answer, sys_prompt),
+                    messages=_make_messages(question, answer, thinking, sys_prompt),
                 )
             )
 
@@ -1027,10 +1092,14 @@ def generate_type_f(
         answer = rng.choice(_REFUSAL_OUT_OF_RANGE).format(
             book=book_name, max_ch=max_ch, ch=fake_ch
         )
+        cot_tmpl = rng.choice(_COT_TYPE_F2)
+        thinking = _wrap_cot(cot_tmpl.format(
+            book=book_name, max_ch=max_ch, ch=fake_ch,
+        ))
         samples.append(
             Sample(
                 sample_type="F",
-                messages=_make_messages(question, answer, sys_prompt),
+                messages=_make_messages(question, answer, thinking, sys_prompt),
             )
         )
 
@@ -1057,10 +1126,14 @@ def generate_type_f(
         answer = rng.choice(_REFUSAL_OUT_OF_RANGE_VERSE).format(
             book=book_name, ch=ch, max_v=max_v, v=fake_v
         )
+        cot_tmpl = rng.choice(_COT_TYPE_F2B)
+        thinking = _wrap_cot(cot_tmpl.format(
+            book=book_name, ch=ch, max_v=max_v, v=fake_v,
+        ))
         samples.append(
             Sample(
                 sample_type="F",
-                messages=_make_messages(question, answer, sys_prompt),
+                messages=_make_messages(question, answer, thinking, sys_prompt),
             )
         )
 
@@ -1071,22 +1144,28 @@ def generate_type_f(
             sys_prompt = _general_prompt(rng)
             if cat_templates and rng.random() < 0.60:
                 answer = rng.choice(cat_templates)
+                cot_tmpl = rng.choice(_COT_TYPE_F3_CATEGORY)
+                thinking = _wrap_cot(cot_tmpl.format(category=category))
             else:
                 answer = rng.choice(_REFUSAL_NON_BIBLE_GENERIC)
+                cot_tmpl = rng.choice(_COT_TYPE_F3_GENERIC)
+                thinking = _wrap_cot(cot_tmpl)
             samples.append(
                 Sample(
                     sample_type="F",
-                    messages=_make_messages(question, answer, sys_prompt),
+                    messages=_make_messages(question, answer, thinking, sys_prompt),
                 )
             )
 
     # --- F4: Ambiguous boundary questions (30) ---
     for question, answer in _BOUNDARY_QUESTIONS:
         sys_prompt = _general_prompt(rng)
+        cot_tmpl = _COT_TYPE_F4[0]
+        thinking = _wrap_cot(cot_tmpl)
         samples.append(
             Sample(
                 sample_type="F",
-                messages=_make_messages(question, answer, sys_prompt),
+                messages=_make_messages(question, answer, thinking, sys_prompt),
             )
         )
 
@@ -1101,10 +1180,14 @@ def generate_type_f(
             answer = rng.choice(_REFUSAL_MISSPELLED_BOOK).format(
                 book=wrong_name, correct_book=correct_name,
             )
+            cot_tmpl = rng.choice(_COT_TYPE_F5)
+            thinking = _wrap_cot(cot_tmpl.format(
+                book=wrong_name, correct=correct_name,
+            ))
             samples.append(
                 Sample(
                     sample_type="F",
-                    messages=_make_messages(question, answer, sys_prompt),
+                    messages=_make_messages(question, answer, thinking, sys_prompt),
                 )
             )
 

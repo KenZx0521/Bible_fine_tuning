@@ -2,6 +2,22 @@
 
 from __future__ import annotations
 
+import re
+
+_THINK_RE = re.compile(r"^<think>\n?(.*?)\n?</think>\n\n(.+)", re.DOTALL)
+
+
+def strip_thinking(response: str) -> tuple[str | None, str]:
+    """Separate thinking and answer from a response.
+
+    Returns (thinking_text, answer_text). If no <think> tags found,
+    returns (None, original_response).
+    """
+    m = _THINK_RE.match(response)
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+    return None, response.strip()
+
 
 def get_stopping_token_ids(tokenizer) -> list[int] | int:
     """Return token IDs that should stop generation.

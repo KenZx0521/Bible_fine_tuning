@@ -13,7 +13,10 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from src.constants import MODEL_ID, OUTPUT_DIR
 from src.response_policy import GENERAL_QA_MODE, LOOKUP_MODE, get_system_prompt, select_response_mode
-from src.utils import get_stopping_token_ids
+from src.utils import get_stopping_token_ids, strip_thinking
+
+# Re-export for backward compatibility
+_strip_thinking = strip_thinking
 
 
 def _load_model(model_path: str | None = None):
@@ -67,6 +70,7 @@ def generate(
     top_p: float = 0.9,
     max_new_tokens: int = 512,
     repetition_penalty: float = 1.15,
+    show_thinking: bool = False,
 ) -> str:
     """Generate a response to a question."""
     response_mode = select_response_mode(question) if mode == "auto" else mode
@@ -98,7 +102,11 @@ def generate(
     response = tokenizer.decode(
         outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
     )
-    return response.strip()
+
+    thinking, answer = _strip_thinking(response)
+    if show_thinking and thinking:
+        return f"[思考過程]\n{thinking}\n\n[回答]\n{answer}"
+    return answer
 
 
 def repl(model_path: str | None = None) -> None:
@@ -109,7 +117,7 @@ def repl(model_path: str | None = None) -> None:
     print("聖經知識助手 — 互動模式")
     print("=" * 60)
     print("輸入問題開始對話，輸入 'quit' 退出")
-    print("可調參數: temperature=0.3, top_p=0.9, max_new_tokens=512, repetition_penalty=1.15, mode=auto")
+    print("可調參數: temperature=0.3, top_p=0.9, max_new_tokens=512, repetition_penalty=1.15, mode=auto, show_thinking=false")
     print("-" * 60)
 
     model, tokenizer = _load_model(model_path)
@@ -119,6 +127,7 @@ def repl(model_path: str | None = None) -> None:
     max_new_tokens = 512
     repetition_penalty = 1.15
     mode = "auto"
+    show_thinking = False
 
     while True:
         try:
@@ -157,6 +166,9 @@ def repl(model_path: str | None = None) -> None:
                     else:
                         mode = value
                         print(f"  mode = {mode}")
+                elif param == "show_thinking":
+                    show_thinking = value.lower() in ("true", "1", "yes")
+                    print(f"  show_thinking = {show_thinking}")
                 else:
                     print(f"  未知參數: {param}")
             continue
@@ -170,6 +182,7 @@ def repl(model_path: str | None = None) -> None:
             top_p=top_p,
             max_new_tokens=max_new_tokens,
             repetition_penalty=repetition_penalty,
+            show_thinking=show_thinking,
         )
         print(f"\n助手: {response}")
 

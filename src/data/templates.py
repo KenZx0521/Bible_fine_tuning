@@ -1079,6 +1079,95 @@ _NON_BIBLE_QUESTIONS: tuple[str, ...] = tuple(
     q for qs in _NON_BIBLE_QUESTIONS_BY_CATEGORY.values() for q in qs
 )
 
+# --- Chain-of-Thought (CoT) templates ---
+
+_COT_TYPE_A = (
+    "這是經文查詢。書卷：{book}；位置：第{chapter}章第{verse}節。提供該節經文。",
+    "問題類型：查經文。目標：{book} {chapter}:{verse}，引用經文原文。",
+    "經文查詢：{book}第{chapter}章第{verse}節，需精準引用。",
+)
+_COT_TYPE_A_SECTION = (
+    "經文查詢：{book}第{chapter}章第{verse}節，位於「{section}」段落。提供經文。",
+    "查經文：{book} {chapter}:{verse}（「{section}」段），引用原文。",
+)
+
+_COT_TYPE_B = (
+    "段落摘要：{book}第{chapter}章「{section}」，歸納核心意思並提供重點。",
+    "問題類型：段落總結。書卷：{book} {chapter}章，段落：「{section}」。",
+    "摘要問題：{book}第{chapter}章「{section}」，整理主旨與關鍵經文。",
+)
+
+_COT_TYPE_C_OVERALL = (
+    "主題經文查詢：「{topic}」，找出聖經中相關經文並列出出處。",
+    "問題類型：主題查經。主題詞：「{topic}」，範圍：全聖經。",
+)
+_COT_TYPE_C_CATEGORY = (
+    "主題經文：「{topic}」，範圍限{category}，列出相關經文。",
+    "查{category}中關於「{topic}」的經文，提供章節引用。",
+)
+_COT_TYPE_C_TESTAMENT = (
+    "主題經文：「{topic}」，範圍：{testament}，列出相關經文。",
+    "查{testament}中「{topic}」主題，提供經文出處。",
+)
+
+_COT_TYPE_D = (
+    "上下文查詢：{book}第{chapter}章第{verse}節，提供前後文脈絡。",
+    "問題類型：查上下文。目標：{book} {chapter}:{verse}，說明前後經文。",
+    "查詢{book}第{chapter}章第{verse}節的上下文，解釋段落背景。",
+)
+
+_COT_TYPE_E = (
+    "經文辨識：根據「{snippet}」片段，找出書卷章節出處。",
+    "問題類型：經文來源識別。分析片段內容，定位書卷章節。",
+    "辨識經文出處：「{snippet}」來自哪卷書第幾章第幾節。",
+)
+
+_COT_TYPE_F1 = (
+    "書卷驗證：「{book}」不在聖經66卷正典中，需拒絕並說明。",
+    "「{book}」不存在於聖經中，禮貌拒絕查詢。",
+)
+_COT_TYPE_F2 = (
+    "章數驗證：{book}只有{max_ch}章，第{ch}章超出範圍，需拒絕。",
+    "範圍檢查：{book}最多{max_ch}章，第{ch}章不存在。",
+)
+_COT_TYPE_F2B = (
+    "節數驗證：{book}第{ch}章只有{max_v}節，第{v}節超出範圍。",
+    "範圍檢查：{book} {ch}:{v}超出實際節數（最多{max_v}節）。",
+)
+_COT_TYPE_F3_CATEGORY = (
+    "問題範圍：這是{category}問題，非聖經內容，需拒絕。",
+    "檢查範圍：{category}領域問題，超出聖經範疇，禮貌說明。",
+)
+_COT_TYPE_F3_GENERIC = (
+    "問題範圍：非聖經內容，需拒絕並說明。",
+    "這個問題超出聖經範圍，禮貌告知並引導。",
+)
+_COT_TYPE_F4 = (
+    "邊界問題：涉及聖經與其他領域交集，需謹慎回答。",
+)
+_COT_TYPE_F5 = (
+    "書名檢查：「{book}」疑似筆誤，正確為「{correct}」，提示更正。",
+    "拼寫驗證：「{book}」有誤，應為「{correct}」。",
+)
+
+_COT_TYPE_G_SECTION = (
+    "主題問答：「{section}」，先回答重點再輔以經文，避免過度引用。",
+    "聖經問答：「{section}」，先說明後引用，重點先行。",
+)
+_COT_TYPE_G_TOPIC = (
+    "主題問答：「{topic}」，先回答要點再補充經文。",
+    "聖經主題：「{topic}」，答案優先、經文輔助。",
+)
+
+_COT_TYPE_H_SECTION = (
+    "簡明問答：「{section}」，白話說明不整段引用，只給出處。",
+    "使用者要求不引用全文。主題：「{section}」，簡潔回答。",
+)
+_COT_TYPE_H_TOPIC = (
+    "簡明問答：「{topic}」，白話說明避免逐字引用。",
+    "使用者要求不貼經文。主題：「{topic}」，重點加出處。",
+)
+
 _BOUNDARY_QUESTIONS = (
     (
         "聖經中有提到恐龍嗎？",

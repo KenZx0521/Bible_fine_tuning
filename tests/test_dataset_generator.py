@@ -11,9 +11,11 @@ from src.constants import (
 from src.data.dataset_generator import (
     _MIN_SAMPLES_PER_BOOK,
     _fix_quote_pairing,
+    _make_messages,
     _match_topic,
     _normalize_inner_quotes,
     _prepare_verse_text,
+    _wrap_cot,
     generate_all_samples,
     generate_type_a,
     generate_type_b,
@@ -207,14 +209,21 @@ class TestTypeDDiversity:
     """Tests for answer diversity in Type D."""
 
     def test_multiple_answer_prefixes(self, sample_books):
-        """Type D should use varied answer templates."""
+        """Type D should use varied answer templates (after CoT)."""
         answers = set()
         for seed in range(50):
             rng = random.Random(seed)
             samples = generate_type_d(sample_books, rng)
             for s in samples:
-                # Grab first 6 chars of each answer for prefix variety
-                answers.add(s.messages[2]["content"][:6])
+                content = s.messages[2]["content"]
+                # Extract answer after </think>\n\n
+                marker = "</think>\n\n"
+                idx = content.find(marker)
+                if idx != -1:
+                    answer_part = content[idx + len(marker):]
+                else:
+                    answer_part = content
+                answers.add(answer_part[:6])
         # With 6 templates, should see more than 1 unique prefix
         assert len(answers) > 1, "Type D answers lack diversity"
 
@@ -1332,3 +1341,140 @@ class TestContextFlowDiversity:
         assert len(results) >= 3, (
             f"Only {len(results)} unique flow texts in 50 seeds, expected >=3"
         )
+
+
+# --- v10: Chain-of-Thought (CoT) tests ---
+
+
+class TestWrapCot:
+    """Tests for _wrap_cot helper."""
+
+    def test_basic_wrapping(self):
+        result = _wrap_cot("測試內容")
+        assert result == "<think>\n測試內容\n</think>"
+
+    def test_empty_string(self):
+        result = _wrap_cot("")
+        assert result == "<think>\n\n</think>"
+
+
+class TestMakeMessagesWithThinking:
+    """Tests for _make_messages with thinking parameter."""
+
+    def test_thinking_prepended_to_answer(self):
+        msgs = _make_messages("Q", "A", thinking="<think>\n思考\n</think>")
+        assert msgs[2]["content"].startswith("<think>")
+        assert "A" in msgs[2]["content"]
+        assert msgs[2]["content"] == "<think>\n思考\n</think>\n\nA"
+
+    def test_no_thinking_leaves_answer_unchanged(self):
+        msgs = _make_messages("Q", "A")
+        assert msgs[2]["content"] == "A"
+
+    def test_empty_thinking_leaves_answer_unchanged(self):
+        msgs = _make_messages("Q", "A", thinking="")
+        assert msgs[2]["content"] == "A"
+
+
+class TestAllTypesHaveCot:
+    """Tests that all sample types include CoT thinking tags."""
+
+    def test_type_a_has_cot(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_a(sample_books, rng)
+        for s in samples:
+            content = s.messages[2]["content"]
+            assert content.startswith("<think>"), (
+                f"Type A missing CoT: {content[:60]}"
+            )
+            assert "</think>\n\n" in content
+
+    def test_type_b_has_cot(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_b(sample_books, rng)
+        for s in samples:
+            content = s.messages[2]["content"]
+            assert content.startswith("<think>"), (
+                f"Type B missing CoT: {content[:60]}"
+            )
+            assert "</think>\n\n" in content
+
+    def test_type_d_has_cot(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_d(sample_books, rng)
+        for s in samples:
+            content = s.messages[2]["content"]
+            assert content.startswith("<think>"), (
+                f"Type D missing CoT: {content[:60]}"
+            )
+            assert "</think>\n\n" in content
+
+    def test_type_f_has_cot(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_f(sample_books, rng)
+        for s in samples[:10]:
+            content = s.messages[2]["content"]
+            assert content.startswith("<think>"), (
+                f"Type F missing CoT: {content[:60]}"
+            )
+            assert "</think>\n\n" in content
+
+    def test_type_g_has_cot(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_g(sample_books, rng)
+        for s in samples:
+            content = s.messages[2]["content"]
+            assert content.startswith("<think>"), (
+                f"Type G missing CoT: {content[:60]}"
+            )
+            assert "</think>\n\n" in content
+
+    def test_type_h_has_cot(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_h(sample_books, rng)
+        for s in samples:
+            content = s.messages[2]["content"]
+            assert content.startswith("<think>"), (
+                f"Type H missing CoT: {content[:60]}"
+            )
+            assert "</think>\n\n" in content
+
+    def test_all_types_have_cot(self, sample_books):
+        all_samples = generate_all_samples(sample_books, seed=42)
+        by_type: dict[str, list] = {}
+        for s in all_samples:
+            by_type.setdefault(s.sample_type, []).append(s)
+        for t in by_type:
+            first = by_type[t][0]
+            assert first.messages[2]["content"].startswith("<think>"), (
+                f"Type {t} first sample missing CoT"
+            )
+
+
+class TestStripThinking:
+    """Tests for strip_thinking helper in utils module."""
+
+    def test_strip_with_tags(self):
+        from src.utils import strip_thinking
+        thinking, answer = strip_thinking("<think>\n思考\n</think>\n\n答案")
+        assert thinking == "思考"
+        assert answer == "答案"
+
+    def test_strip_no_tags(self):
+        from src.utils import strip_thinking
+        thinking, answer = strip_thinking("直接答案")
+        assert thinking is None
+        assert answer == "直接答案"
+
+    def test_strip_multiline_thinking(self):
+        from src.utils import strip_thinking
+        response = "<think>\n第一行\n第二行\n</think>\n\n答案內容"
+        thinking, answer = strip_thinking(response)
+        assert thinking == "第一行\n第二行"
+        assert answer == "答案內容"
+
+    def test_strip_with_empty_thinking(self):
+        from src.utils import strip_thinking
+        thinking, answer = strip_thinking("<think>\n\n</think>\n\n答案")
+        assert thinking == ""
+        assert answer == "答案"
