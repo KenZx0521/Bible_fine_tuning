@@ -422,6 +422,7 @@ def generate_type_a(books: list[Book], rng: random.Random) -> list[Sample]:
                 verse.section_title
                 and rng.random() < 0.60
             )
+            category = _BOOK_TO_CATEGORY.get(verse.book, "聖經書卷")
             if use_extended:
                 answer_template = rng.choice(_VERSE_ANSWER_EXTENDED_TEMPLATES)
                 answer = answer_template.format(
@@ -435,6 +436,7 @@ def generate_type_a(books: list[Book], rng: random.Random) -> list[Sample]:
                 thinking = _wrap_cot(cot_tmpl.format(
                     book=verse.book, chapter=verse.chapter,
                     verse=verse.verse_number, section=verse.section_title,
+                    category=category,
                 ))
             else:
                 answer_template = rng.choice(_VERSE_ANSWER_TEMPLATES)
@@ -447,7 +449,7 @@ def generate_type_a(books: list[Book], rng: random.Random) -> list[Sample]:
                 cot_tmpl = rng.choice(_COT_TYPE_A)
                 thinking = _wrap_cot(cot_tmpl.format(
                     book=verse.book, chapter=verse.chapter,
-                    verse=verse.verse_number,
+                    verse=verse.verse_number, category=category,
                 ))
             samples.append(
                 Sample(
@@ -504,6 +506,7 @@ def generate_type_b(books: list[Book], rng: random.Random) -> list[Sample]:
                 thinking = _wrap_cot(cot_tmpl.format(
                     book=book.name, chapter=chapter.number,
                     section=section.title,
+                    verse_count=len(section.verses),
                 ))
                 samples.append(
                     Sample(
@@ -606,7 +609,10 @@ def generate_type_c(
                 category=cat, topic=topic, verse_lines=verse_lines_text,
             )
             cot_tmpl = rng.choice(_COT_TYPE_C_CATEGORY)
-            thinking = _wrap_cot(cot_tmpl.format(topic=topic, category=cat))
+            testament = _get_testament_for_category(cat) or "聖經"
+            thinking = _wrap_cot(cot_tmpl.format(
+                topic=topic, category=cat, testament=testament,
+            ))
             samples.append(
                 Sample(
                     sample_type="C",
@@ -644,7 +650,9 @@ def generate_type_c(
                 topic=topic, verse_lines=verse_lines_text,
             )
             cot_tmpl = rng.choice(_COT_TYPE_C_OVERALL)
-            thinking = _wrap_cot(cot_tmpl.format(topic=topic))
+            thinking = _wrap_cot(cot_tmpl.format(
+                topic=topic, match_count=len(all_verses),
+            ))
             samples.append(
                 Sample(
                     sample_type="C",
@@ -1160,7 +1168,7 @@ def generate_type_f(
     # --- F4: Ambiguous boundary questions (30) ---
     for question, answer in _BOUNDARY_QUESTIONS:
         sys_prompt = _general_prompt(rng)
-        cot_tmpl = _COT_TYPE_F4[0]
+        cot_tmpl = rng.choice(_COT_TYPE_F4)
         thinking = _wrap_cot(cot_tmpl)
         samples.append(
             Sample(

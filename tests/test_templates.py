@@ -9,6 +9,25 @@ from src.data.templates import (
     _CONTEXT_ANSWER_TEMPLATES,
     _CONTEXT_EXPLANATION_TEMPLATES,
     _CONTEXT_TEMPLATES,
+    _COT_TYPE_A,
+    _COT_TYPE_A_SECTION,
+    _COT_TYPE_B,
+    _COT_TYPE_C_CATEGORY,
+    _COT_TYPE_C_OVERALL,
+    _COT_TYPE_C_TESTAMENT,
+    _COT_TYPE_D,
+    _COT_TYPE_E,
+    _COT_TYPE_F1,
+    _COT_TYPE_F2,
+    _COT_TYPE_F2B,
+    _COT_TYPE_F3_CATEGORY,
+    _COT_TYPE_F3_GENERIC,
+    _COT_TYPE_F4,
+    _COT_TYPE_F5,
+    _COT_TYPE_G_SECTION,
+    _COT_TYPE_G_TOPIC,
+    _COT_TYPE_H_SECTION,
+    _COT_TYPE_H_TOPIC,
     _FAKE_BOOKS,
     _FAKE_QUERY_TEMPLATES,
     _GENERAL_SECTION_ANSWER_TEMPLATES,
@@ -522,3 +541,168 @@ class TestNewTemplateCounts:
 
     def test_no_quote_answer_min_4(self):
         assert len(_NO_QUOTE_ANSWER_TEMPLATES) >= 4
+
+
+# --- v11: Deeper CoT template tests ---
+
+
+class TestCotTemplateMinCounts:
+    """All 19 CoT tuples should have >= 3 templates (v11)."""
+
+    def test_cot_type_a_min_3(self):
+        assert len(_COT_TYPE_A) >= 3
+
+    def test_cot_type_a_section_min_3(self):
+        assert len(_COT_TYPE_A_SECTION) >= 3
+
+    def test_cot_type_b_min_3(self):
+        assert len(_COT_TYPE_B) >= 3
+
+    def test_cot_type_c_overall_min_3(self):
+        assert len(_COT_TYPE_C_OVERALL) >= 3
+
+    def test_cot_type_c_category_min_3(self):
+        assert len(_COT_TYPE_C_CATEGORY) >= 3
+
+    def test_cot_type_c_testament_min_3(self):
+        assert len(_COT_TYPE_C_TESTAMENT) >= 3
+
+    def test_cot_type_d_min_3(self):
+        assert len(_COT_TYPE_D) >= 3
+
+    def test_cot_type_e_min_3(self):
+        assert len(_COT_TYPE_E) >= 3
+
+    def test_cot_type_f1_min_3(self):
+        assert len(_COT_TYPE_F1) >= 3
+
+    def test_cot_type_f2_min_3(self):
+        assert len(_COT_TYPE_F2) >= 3
+
+    def test_cot_type_f2b_min_3(self):
+        assert len(_COT_TYPE_F2B) >= 3
+
+    def test_cot_type_f3_category_min_3(self):
+        assert len(_COT_TYPE_F3_CATEGORY) >= 3
+
+    def test_cot_type_f3_generic_min_3(self):
+        assert len(_COT_TYPE_F3_GENERIC) >= 3
+
+    def test_cot_type_f4_min_3(self):
+        assert len(_COT_TYPE_F4) >= 3
+
+    def test_cot_type_f5_min_3(self):
+        assert len(_COT_TYPE_F5) >= 3
+
+    def test_cot_type_g_section_min_3(self):
+        assert len(_COT_TYPE_G_SECTION) >= 3
+
+    def test_cot_type_g_topic_min_3(self):
+        assert len(_COT_TYPE_G_TOPIC) >= 3
+
+    def test_cot_type_h_section_min_3(self):
+        assert len(_COT_TYPE_H_SECTION) >= 3
+
+    def test_cot_type_h_topic_min_3(self):
+        assert len(_COT_TYPE_H_TOPIC) >= 3
+
+
+class TestCotTemplatePlaceholders:
+    """New placeholders should exist in the correct CoT templates (v11)."""
+
+    def test_type_a_has_category(self):
+        for tmpl in _COT_TYPE_A:
+            assert "{category}" in tmpl, f"Missing {{category}} in A: {tmpl[:60]}"
+
+    def test_type_a_section_has_category(self):
+        for tmpl in _COT_TYPE_A_SECTION:
+            # At least some should have {category}
+            pass
+        has_cat = any("{category}" in t for t in _COT_TYPE_A_SECTION)
+        assert has_cat, "No _COT_TYPE_A_SECTION template contains {category}"
+
+    def test_type_b_has_verse_count(self):
+        for tmpl in _COT_TYPE_B:
+            assert "{verse_count}" in tmpl, f"Missing {{verse_count}} in B: {tmpl[:60]}"
+
+    def test_type_c_overall_has_match_count(self):
+        for tmpl in _COT_TYPE_C_OVERALL:
+            assert "{match_count}" in tmpl, f"Missing {{match_count}} in C overall: {tmpl[:60]}"
+
+    def test_type_c_category_has_testament(self):
+        has_testament = any("{testament}" in t for t in _COT_TYPE_C_CATEGORY)
+        assert has_testament, "No _COT_TYPE_C_CATEGORY template contains {testament}"
+
+    def test_type_a_still_has_book_chapter_verse(self):
+        for tmpl in _COT_TYPE_A:
+            assert "{book}" in tmpl, f"Missing {{book}} in A: {tmpl[:60]}"
+            assert "{chapter}" in tmpl, f"Missing {{chapter}} in A: {tmpl[:60]}"
+            assert "{verse}" in tmpl, f"Missing {{verse}} in A: {tmpl[:60]}"
+
+    def test_type_d_still_has_book_chapter_verse(self):
+        for tmpl in _COT_TYPE_D:
+            assert "{book}" in tmpl, f"Missing {{book}} in D: {tmpl[:60]}"
+            assert "{chapter}" in tmpl, f"Missing {{chapter}} in D: {tmpl[:60]}"
+            assert "{verse}" in tmpl, f"Missing {{verse}} in D: {tmpl[:60]}"
+
+    def test_type_f1_has_book(self):
+        for tmpl in _COT_TYPE_F1:
+            assert "{book}" in tmpl, f"Missing {{book}} in F1: {tmpl[:60]}"
+
+    def test_type_f5_has_book_and_correct(self):
+        for tmpl in _COT_TYPE_F5:
+            assert "{book}" in tmpl, f"Missing {{book}} in F5: {tmpl[:60]}"
+            assert "{correct}" in tmpl, f"Missing {{correct}} in F5: {tmpl[:60]}"
+
+
+class TestCotTemplateReasoningStructure:
+    """CoT templates should contain reasoning steps (v11)."""
+
+    _ALL_COT_TUPLES = {
+        "A": _COT_TYPE_A,
+        "A_SECTION": _COT_TYPE_A_SECTION,
+        "B": _COT_TYPE_B,
+        "C_OVERALL": _COT_TYPE_C_OVERALL,
+        "C_CATEGORY": _COT_TYPE_C_CATEGORY,
+        "C_TESTAMENT": _COT_TYPE_C_TESTAMENT,
+        "D": _COT_TYPE_D,
+        "E": _COT_TYPE_E,
+        "F1": _COT_TYPE_F1,
+        "F2": _COT_TYPE_F2,
+        "F2B": _COT_TYPE_F2B,
+        "F3_CATEGORY": _COT_TYPE_F3_CATEGORY,
+        "F3_GENERIC": _COT_TYPE_F3_GENERIC,
+        "F4": _COT_TYPE_F4,
+        "F5": _COT_TYPE_F5,
+        "G_SECTION": _COT_TYPE_G_SECTION,
+        "G_TOPIC": _COT_TYPE_G_TOPIC,
+        "H_SECTION": _COT_TYPE_H_SECTION,
+        "H_TOPIC": _COT_TYPE_H_TOPIC,
+    }
+
+    def test_all_templates_have_reasoning_steps(self):
+        """Every CoT template should contain numbered steps or arrow chains."""
+        for name, tupl in self._ALL_COT_TUPLES.items():
+            for tmpl in tupl:
+                has_steps = "1." in tmpl or "→" in tmpl
+                assert has_steps, (
+                    f"CoT {name} lacks reasoning steps: {tmpl[:60]}"
+                )
+
+    def test_step_format_distribution(self):
+        """Across all templates, ~60% should use numbered steps, ~40% arrows."""
+        numbered = 0
+        arrow = 0
+        for tupl in self._ALL_COT_TUPLES.values():
+            for tmpl in tupl:
+                if "1." in tmpl:
+                    numbered += 1
+                elif "→" in tmpl:
+                    arrow += 1
+        total = numbered + arrow
+        assert total > 0
+        numbered_ratio = numbered / total
+        # Allow 40-80% numbered (flexible)
+        assert 0.40 < numbered_ratio < 0.80, (
+            f"Numbered ratio {numbered_ratio:.2%} outside 40-80%"
+        )

@@ -1478,3 +1478,129 @@ class TestStripThinking:
         thinking, answer = strip_thinking("<think>\n\n</think>\n\n答案")
         assert thinking == ""
         assert answer == "答案"
+
+
+# --- v11: Deeper CoT reasoning tests ---
+
+
+class TestCotReasoningDepth:
+    """Tests that CoT contains reasoning steps (not just task labels)."""
+
+    def _extract_thinking(self, content: str) -> str:
+        """Extract text between <think> and </think>."""
+        start = content.find("<think>\n")
+        end = content.find("\n</think>")
+        if start == -1 or end == -1:
+            return ""
+        return content[start + len("<think>\n"):end]
+
+    def test_type_a_cot_has_steps(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_a(sample_books, rng)
+        for s in samples:
+            thinking = self._extract_thinking(s.messages[2]["content"])
+            assert "1." in thinking or "→" in thinking, (
+                f"Type A CoT lacks steps: {thinking}"
+            )
+
+    def test_type_b_cot_has_steps(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_b(sample_books, rng)
+        for s in samples:
+            thinking = self._extract_thinking(s.messages[2]["content"])
+            assert "1." in thinking or "→" in thinking, (
+                f"Type B CoT lacks steps: {thinking}"
+            )
+
+    def test_type_d_cot_has_steps(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_d(sample_books, rng)
+        for s in samples:
+            thinking = self._extract_thinking(s.messages[2]["content"])
+            assert "1." in thinking or "→" in thinking, (
+                f"Type D CoT lacks steps: {thinking}"
+            )
+
+    def test_type_f_cot_has_steps(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_f(sample_books, rng)
+        for s in samples[:20]:
+            thinking = self._extract_thinking(s.messages[2]["content"])
+            assert "1." in thinking or "→" in thinking, (
+                f"Type F CoT lacks steps: {thinking}"
+            )
+
+    def test_type_g_cot_has_steps(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_g(sample_books, rng)
+        for s in samples:
+            thinking = self._extract_thinking(s.messages[2]["content"])
+            assert "1." in thinking or "→" in thinking, (
+                f"Type G CoT lacks steps: {thinking}"
+            )
+
+    def test_type_h_cot_has_steps(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_h(sample_books, rng)
+        for s in samples:
+            thinking = self._extract_thinking(s.messages[2]["content"])
+            assert "1." in thinking or "→" in thinking, (
+                f"Type H CoT lacks steps: {thinking}"
+            )
+
+
+class TestCotTypeACategory:
+    """Tests that Type A CoT includes the book category (v11)."""
+
+    def test_type_a_cot_contains_category(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_a(sample_books, rng)
+        for s in samples:
+            thinking = s.messages[2]["content"]
+            start = thinking.find("<think>\n")
+            end = thinking.find("\n</think>")
+            cot_text = thinking[start + len("<think>\n"):end]
+            # 創世記 belongs to 律法書
+            assert "律法書" in cot_text, (
+                f"Type A CoT missing category: {cot_text}"
+            )
+
+
+class TestCotTypeBVerseCount:
+    """Tests that Type B CoT includes the verse count (v11)."""
+
+    def test_type_b_cot_contains_verse_count(self, sample_books):
+        rng = random.Random(42)
+        samples = generate_type_b(sample_books, rng)
+        for s in samples:
+            thinking = s.messages[2]["content"]
+            start = thinking.find("<think>\n")
+            end = thinking.find("\n</think>")
+            cot_text = thinking[start + len("<think>\n"):end]
+            # section verses: 3, 2, 1
+            assert any(str(n) in cot_text for n in (1, 2, 3)), (
+                f"Type B CoT missing verse count: {cot_text}"
+            )
+
+
+class TestCotF4Diversity:
+    """Tests that F4 uses rng.choice (not hardcoded [0]) (v11)."""
+
+    def test_f4_produces_multiple_cot_variants(self, sample_books):
+        cot_texts = set()
+        for seed in range(50):
+            rng = random.Random(seed)
+            samples = generate_type_f(sample_books, rng)
+            # F4 samples are boundary questions
+            from src.data.templates import _BOUNDARY_QUESTIONS
+            boundary_qs = {q for q, _ in _BOUNDARY_QUESTIONS}
+            for s in samples:
+                if s.messages[1]["content"] in boundary_qs:
+                    thinking = s.messages[2]["content"]
+                    start = thinking.find("<think>\n")
+                    end = thinking.find("\n</think>")
+                    cot_text = thinking[start + len("<think>\n"):end]
+                    cot_texts.add(cot_text)
+        assert len(cot_texts) >= 2, (
+            f"F4 only produced {len(cot_texts)} CoT variants, expected >= 2"
+        )
